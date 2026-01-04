@@ -92,16 +92,14 @@ async function handleInit(): Promise<void> {
   try {
     console.log('[Worker] Initializing Rayforce WASM...');
 
-    // Get base path from worker location (handles GitHub Pages subpath)
-    const workerUrl = new URL(self.location.href);
-    const basePath = workerUrl.pathname.replace(/\/assets\/.*$/, '');
+    // Load from unpkg CDN
+    const CDN_BASE = 'https://unpkg.com/rayforce-wasm@0.1.0/dist';
     
-    const jsUrl = `${workerUrl.origin}${basePath}/rayforce/rayforce.js`;
-    const sdkUrl = `${workerUrl.origin}${basePath}/rayforce/rayforce.sdk.js`;
-    const wasmUrl = `${workerUrl.origin}${basePath}/rayforce/rayforce.wasm`;
+    const jsUrl = `${CDN_BASE}/rayforce.js`;
+    const sdkUrl = `${CDN_BASE}/rayforce.sdk.js`;
+    const wasmUrl = `${CDN_BASE}/rayforce.wasm`;
     
-    console.log('[Worker] Base path:', basePath);
-    console.log('[Worker] WASM URL:', wasmUrl);
+    console.log('[Worker] Loading from CDN:', CDN_BASE);
     
     // Fetch and patch the WASM loader
     const response = await fetch(jsUrl);
