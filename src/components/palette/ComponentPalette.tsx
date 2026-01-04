@@ -250,16 +250,16 @@ function CategorySection({
   const [isOpen, setIsOpen] = useState(true);
 
   return (
-    <div className="border-b border-gray-800 last:border-0">
+    <div className="border-b border-gray-200 dark:border-gray-800 last:border-0">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full px-3 py-2 hover:bg-gray-800/30 text-left"
+        className="flex items-center justify-between w-full px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800/30 text-left"
       >
-        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
           {title}
         </span>
         <svg
-          className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-0' : '-rotate-90'}`}
+          className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${isOpen ? 'rotate-0' : '-rotate-90'}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -280,13 +280,13 @@ function CategorySection({
                 onDragStart(component);
               }}
               onClick={() => onComponentClick(component)}
-              className="flex flex-col items-center gap-1 p-2 rounded cursor-grab active:cursor-grabbing hover:bg-gray-800 transition-colors group"
+              className="flex flex-col items-center gap-1 p-2 rounded cursor-grab active:cursor-grabbing hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
               title={component.description}
             >
-              <div className="text-gray-500 group-hover:text-ray-400 transition-colors">
+              <div className="text-gray-400 dark:text-gray-500 group-hover:text-ray-500 dark:group-hover:text-ray-400 transition-colors">
                 {component.icon}
               </div>
-              <span className="text-2xs text-gray-400 group-hover:text-gray-300 text-center leading-tight">
+              <span className="text-2xs text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300 text-center leading-tight">
                 {component.name}
               </span>
             </div>
@@ -305,9 +305,9 @@ export function ComponentPalette({ onDragStart, onComponentClick }: ComponentPal
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-3 border-b border-gray-800">
-        <h2 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-          <svg className="w-4 h-4 text-ray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="p-3 border-b border-gray-200 dark:border-gray-800">
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <svg className="w-4 h-4 text-ray-600 dark:text-ray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
           </svg>
           Components

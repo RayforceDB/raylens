@@ -7,7 +7,26 @@
     --color-ray-500: #0ea5e9;
   }
 
-  /* Custom scrollbar */
+  /* Custom scrollbar - dark mode */
+  .dark ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .dark ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgb(75 85 99 / 0.5);
+    border-radius: 4px;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgb(75 85 99 / 0.7);
+  }
+
+  /* Custom scrollbar - light mode */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -18,18 +37,23 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgb(75 85 99 / 0.5);
+    background: rgb(156 163 175 / 0.5);
     border-radius: 4px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgb(75 85 99 / 0.7);
+    background: rgb(156 163 175 / 0.7);
   }
 
   /* Firefox scrollbar */
-  * {
+  .dark * {
     scrollbar-width: thin;
     scrollbar-color: rgb(75 85 99 / 0.5) transparent;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(156 163 175 / 0.5) transparent;
   }
 
   /* Focus visible outline */
@@ -47,7 +71,7 @@
 @layer components {
   /* Panel styling */
   .panel {
-    @apply bg-gray-900 border border-gray-800 rounded-lg;
+    @apply bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg;
   }
 
   /* Table cell */
@@ -61,28 +85,28 @@
   }
 
   .dtype-numeric {
-    @apply bg-emerald-500/10 text-emerald-400;
+    @apply bg-emerald-500/10 text-emerald-600 dark:text-emerald-400;
   }
 
   .dtype-temporal {
-    @apply bg-violet-500/10 text-violet-400;
+    @apply bg-violet-500/10 text-violet-600 dark:text-violet-400;
   }
 
   .dtype-categorical {
-    @apply bg-amber-500/10 text-amber-400;
+    @apply bg-amber-500/10 text-amber-600 dark:text-amber-400;
   }
 
   .dtype-boolean {
-    @apply bg-pink-500/10 text-pink-400;
+    @apply bg-pink-500/10 text-pink-600 dark:text-pink-400;
   }
 
   .dtype-string {
-    @apply bg-indigo-500/10 text-indigo-400;
+    @apply bg-indigo-500/10 text-indigo-600 dark:text-indigo-400;
   }
 
   /* Loading skeleton */
   .skeleton {
-    @apply animate-pulse bg-gray-800 rounded;
+    @apply animate-pulse bg-gray-200 dark:bg-gray-800 rounded;
   }
 }
 

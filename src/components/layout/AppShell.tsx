@@ -23,6 +23,8 @@ export function AppShell() {
     dataset,
     loadSampleData,
     loadCSVData,
+    theme,
+    toggleTheme,
   } = useRayLensStore();
 
   // Panel visibility
@@ -128,14 +130,14 @@ export function AppShell() {
   const availableFields = dataset?.schema.map((s) => s.name) ?? [];
 
   return (
-    <div className="flex h-screen flex-col bg-gray-950">
+    <div className="flex h-screen flex-col bg-gray-50 dark:bg-gray-950">
       {/* Top toolbar */}
-      <header className="flex h-12 items-center justify-between border-b border-gray-800 px-4 shrink-0">
+      <header className="flex h-12 items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 shrink-0">
         <div className="flex items-center gap-4">
           {/* Logo */}
           <div className="flex items-center gap-2">
             <svg
-              className="h-6 w-6 text-ray-500"
+              className="h-6 w-6 text-ray-600 dark:text-ray-500"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -145,14 +147,14 @@ export function AppShell() {
               <path d="M2 17l10 5 10-5" />
               <path d="M2 12l10 5 10-5" />
             </svg>
-            <span className="font-semibold text-white">RayLens</span>
+            <span className="font-semibold text-gray-900 dark:text-white">RayLens</span>
           </div>
 
           {/* Menu items */}
           <nav className="flex items-center gap-1">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -171,17 +173,17 @@ export function AppShell() {
                 loadSampleData();
                 setLeftPanelTab('data');
               }}
-              className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
               </svg>
               Sample Data
             </button>
-            <div className="w-px h-6 bg-gray-800 mx-2" />
+            <div className="w-px h-6 bg-gray-200 dark:bg-gray-800 mx-2" />
             <button
               onClick={() => setWidgets([])}
-              className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -192,13 +194,31 @@ export function AppShell() {
         </div>
 
         <div className="flex items-center gap-4">
-          <span className="text-xs text-gray-500">Rayforce {version ?? '...'}</span>
+          <span className="text-xs text-gray-500 dark:text-gray-500">Rayforce {version ?? '...'}</span>
+          
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-1.5 rounded transition-colors text-gray-500 hover:text-gray-300 dark:text-gray-400 dark:hover:text-white"
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            )}
+          </button>
+          
           {/* Panel toggles */}
           <div className="flex items-center gap-1">
             <button
               onClick={() => setLeftPanelOpen(!leftPanelOpen)}
               className={`p-1.5 rounded transition-colors ${
-                leftPanelOpen ? 'bg-gray-800 text-ray-400' : 'text-gray-500 hover:text-gray-300'
+                leftPanelOpen ? 'bg-gray-200 dark:bg-gray-800 text-ray-600 dark:text-ray-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
               title="Toggle left panel"
             >
@@ -209,7 +229,7 @@ export function AppShell() {
             <button
               onClick={() => setRightPanelOpen(!rightPanelOpen)}
               className={`p-1.5 rounded transition-colors ${
-                rightPanelOpen ? 'bg-gray-800 text-ray-400' : 'text-gray-500 hover:text-gray-300'
+                rightPanelOpen ? 'bg-gray-200 dark:bg-gray-800 text-ray-600 dark:text-ray-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
               title="Toggle right panel"
             >
@@ -225,15 +245,15 @@ export function AppShell() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left panel - Components & Data */}
         {leftPanelOpen && (
-          <aside className="w-64 border-r border-gray-800 bg-gray-900/50 flex flex-col shrink-0">
+          <aside className="w-64 border-r border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/50 flex flex-col shrink-0">
             {/* Tab buttons */}
-            <div className="flex border-b border-gray-800">
+            <div className="flex border-b border-gray-200 dark:border-gray-800">
               <button
                 onClick={() => setLeftPanelTab('components')}
                 className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
                   leftPanelTab === 'components'
-                    ? 'text-white bg-gray-800/50 border-b-2 border-ray-500'
-                    : 'text-gray-400 hover:text-gray-300'
+                    ? 'text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800/50 border-b-2 border-ray-500'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
               >
                 Components
@@ -242,11 +262,11 @@ export function AppShell() {
                 onClick={() => setLeftPanelTab('data')}
                 className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
                   leftPanelTab === 'data'
-                    ? 'text-white bg-gray-800/50 border-b-2 border-ray-500'
-                    : 'text-gray-400 hover:text-gray-300'
+                    ? 'text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800/50 border-b-2 border-ray-500'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
               >
-                Data {dataset && <span className="ml-1 text-ray-400">•</span>}
+                Data {dataset && <span className="ml-1 text-ray-500 dark:text-ray-400">•</span>}
               </button>
             </div>
 
@@ -265,7 +285,7 @@ export function AppShell() {
         )}
 
         {/* Center - Dashboard Canvas */}
-        <main ref={canvasRef} className="flex-1 overflow-hidden p-4">
+        <main ref={canvasRef} className="flex-1 overflow-hidden p-4 bg-gray-100/50 dark:bg-transparent">
           <DashboardCanvas
             widgets={widgets}
             onWidgetsChange={setWidgets}
@@ -280,7 +300,7 @@ export function AppShell() {
 
         {/* Right panel - Property Inspector */}
         {rightPanelOpen && (
-          <aside className="w-72 border-l border-gray-800 bg-gray-900/50 shrink-0">
+          <aside className="w-72 border-l border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/50 shrink-0">
             <PropertyInspector
               selectedComponent={selectedWidget?.component ?? null}
               title={selectedWidget?.title ?? ''}
@@ -300,7 +320,7 @@ export function AppShell() {
       </div>
 
       {/* Status bar */}
-      <footer className="flex h-6 items-center justify-between border-t border-gray-800 bg-gray-900 px-4 text-2xs text-gray-500 shrink-0">
+      <footer className="flex h-6 items-center justify-between border-t border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 px-4 text-2xs text-gray-500 shrink-0">
         <div className="flex items-center gap-4">
           {dataset ? (
             <>

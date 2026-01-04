@@ -97,8 +97,8 @@ function WidgetContainer({
 
   return (
     <div
-      className={`h-full flex flex-col bg-gray-900 rounded-lg border transition-colors ${
-        isSelected ? 'border-ray-500' : 'border-gray-800 hover:border-gray-700'
+      className={`h-full flex flex-col bg-white dark:bg-gray-900 rounded-lg border shadow-sm dark:shadow-none transition-colors ${
+        isSelected ? 'border-ray-500' : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
       }`}
       onClick={(e) => {
         e.stopPropagation();
@@ -106,8 +106,8 @@ function WidgetContainer({
       }}
     >
       {/* Widget header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800 cursor-move drag-handle">
-        <h3 className="text-sm font-medium text-gray-300 truncate">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 cursor-move drag-handle">
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
           {widget.title || widget.component.name}
         </h3>
         <div className="flex items-center gap-1">
@@ -115,7 +115,7 @@ function WidgetContainer({
             onClick={(e) => {
               e.stopPropagation();
             }}
-            className="p-1 text-gray-500 hover:text-gray-300 rounded hover:bg-gray-800"
+            className="p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
@@ -126,7 +126,7 @@ function WidgetContainer({
               e.stopPropagation();
               onRemove();
             }}
-            className="p-1 text-gray-500 hover:text-red-400 rounded hover:bg-gray-800"
+            className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -148,9 +148,9 @@ function ControlPlaceholder({ component }: { component: ComponentDefinition }) {
   const fullComponent = getComponentById(component.id);
   
   return (
-    <div className="h-full flex items-center justify-center bg-gray-800/30 rounded">
+    <div className="h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800/30 rounded">
       <div className="text-center">
-        <div className="text-gray-600 mb-2">{fullComponent?.icon ?? '📦'}</div>
+        <div className="text-gray-400 dark:text-gray-600 mb-2">{fullComponent?.icon ?? '📦'}</div>
         <span className="text-xs text-gray-500">{component.name}</span>
       </div>
     </div>
@@ -243,13 +243,13 @@ export function DashboardCanvas({
         onDragLeave={() => setIsDragOver(false)}
         onDrop={handleDrop}
         className={`h-full flex items-center justify-center border-2 border-dashed rounded-lg transition-colors ${
-          isDragOver ? 'border-ray-500 bg-ray-500/5' : 'border-gray-800'
+          isDragOver ? 'border-ray-500 bg-ray-500/5' : 'border-gray-300 dark:border-gray-800'
         }`}
       >
         <div className="text-center max-w-md px-4">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-800 flex items-center justify-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
             <svg
-              className="w-8 h-8 text-gray-600"
+              className="w-8 h-8 text-gray-400 dark:text-gray-600"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -262,7 +262,7 @@ export function DashboardCanvas({
               />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-gray-300 mb-2">
+          <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
             Build Your Dashboard
           </h3>
           <p className="text-sm text-gray-500">

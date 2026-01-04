@@ -55,8 +55,12 @@ export interface RayLensStore {
   chartType: ChartType;
   chartTypeAuto: boolean;
   sidebarOpen: boolean;
+  
+  // Theme
+  theme: 'light' | 'dark';
 
   // Actions
+  toggleTheme: () => void;
   init: () => Promise<void>;
   eval: (expression: string) => Promise<unknown>;
   loadSampleData: () => Promise<void>;
@@ -192,6 +196,23 @@ export const useRayLensStore = create<RayLensStore>()(
         chartType: 'table',
         chartTypeAuto: true,
         sidebarOpen: true,
+        theme: (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark',
+
+        // ====================================================================
+        // Theme Actions
+        // ====================================================================
+        
+        toggleTheme: () => {
+          set((state) => {
+            const newTheme = state.theme === 'dark' ? 'light' : 'dark';
+            // Update document class
+            if (typeof document !== 'undefined') {
+              document.documentElement.classList.remove('dark', 'light');
+              document.documentElement.classList.add(newTheme);
+            }
+            state.theme = newTheme;
+          });
+        },
 
         // ====================================================================
         // Rayforce Actions
