@@ -1,13 +1,22 @@
 /**
  * ChartCanvas - Main chart rendering area
- * Uses ECharts for rendering
+ * 
+ * KX Dashboards-style visualization with:
+ * - Multiple chart types (bar, line, area, scatter, pie, heatmap, candlestick, radar, gauge)
+ * - Theme-aware colors (light/dark)
+ * - Interactive tooltips
+ * - Zoom/pan support
+ * - Legend toggle
+ * 
+ * @see https://code.kx.com/dashboards/chartgl/
  */
 
 import { useEffect, useRef, useMemo } from 'react';
 import * as echarts from 'echarts';
 import type { EncodedField } from './EncodingShelf';
+import { useRayLensStore } from '@core/store';
 
-type ChartType = 'bar' | 'line' | 'area' | 'scatter' | 'pie' | 'heatmap';
+type ChartType = 'bar' | 'line' | 'area' | 'scatter' | 'pie' | 'heatmap' | 'candlestick' | 'radar' | 'gauge' | 'treemap';
 
 interface ChartCanvasProps {
   title?: string;
@@ -15,8 +24,11 @@ interface ChartCanvasProps {
   rows: EncodedField[];
   columns: EncodedField[];
   values: EncodedField[];
-  colorField: EncodedField | undefined;
+  colorField?: EncodedField | undefined;
   data?: Record<string, unknown>[];
+  showLegend?: boolean;
+  showToolbox?: boolean;
+  animation?: boolean;
 }
 
 // Color palette - Tableau-inspired
@@ -33,6 +45,18 @@ const COLORS = [
   '#bab0ac', // gray
 ];
 
+// Theme colors
+const getThemeColors = (isDark: boolean) => ({
+  textColor: isDark ? '#9ca3af' : '#6b7280',
+  titleColor: isDark ? '#f3f4f6' : '#111827',
+  axisLine: isDark ? '#374151' : '#d1d5db',
+  splitLine: isDark ? '#1f2937' : '#e5e7eb',
+  tooltipBg: isDark ? 'rgba(17, 24, 39, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+  tooltipBorder: isDark ? '#374151' : '#e5e7eb',
+  tooltipText: isDark ? '#f3f4f6' : '#111827',
+  background: 'transparent',
+});
+
 export function ChartCanvas({
   title,
   chartType,
@@ -41,9 +65,15 @@ export function ChartCanvas({
   values,
   colorField: _colorField,
   data = [],
+  showLegend = true,
+  showToolbox = true,
+  animation = true,
 }: ChartCanvasProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
+  const { theme } = useRayLensStore();
+  const isDark = theme === 'dark';
+  const themeColors = getThemeColors(isDark);
 
   // Generate mock data if no real data provided
   const chartData = useMemo(() => {
@@ -95,35 +125,56 @@ export function ChartCanvas({
     const seriesData = chartData.map((d) => (d as Record<string, unknown>)[valueField] ?? (d as Record<string, unknown>).value);
 
     const baseOption: echarts.EChartsOption = {
-      backgroundColor: 'transparent',
+      backgroundColor: themeColors.background,
+      animation,
       textStyle: {
-        fontFamily: 'Inter, system-ui, sans-serif',
-        color: '#9ca3af',
+        fontFamily: 'DM Sans, Inter, system-ui, sans-serif',
+        color: themeColors.textColor,
       },
       ...(title && {
         title: {
           text: title,
           left: 'center',
           textStyle: {
-            color: '#f3f4f6',
+            color: themeColors.titleColor,
             fontSize: 16,
             fontWeight: 500,
           },
         },
       }),
       tooltip: {
-        trigger: chartType === 'pie' ? 'item' : 'axis',
-        backgroundColor: 'rgba(17, 24, 39, 0.95)',
-        borderColor: '#374151',
+        trigger: chartType === 'pie' || chartType === 'radar' || chartType === 'treemap' ? 'item' : 'axis',
+        backgroundColor: themeColors.tooltipBg,
+        borderColor: themeColors.tooltipBorder,
         textStyle: {
-          color: '#f3f4f6',
+          color: themeColors.tooltipText,
         },
+        confine: true,
       },
+      legend: showLegend ? {
+        show: true,
+        bottom: 0,
+        textStyle: { color: themeColors.textColor },
+        pageTextStyle: { color: themeColors.textColor },
+      } : { show: false },
+      toolbox: showToolbox ? {
+        show: true,
+        right: 10,
+        top: 0,
+        feature: {
+          dataZoom: { yAxisIndex: 'none' },
+          restore: {},
+          saveAsImage: { backgroundColor: isDark ? '#111827' : '#ffffff' },
+        },
+        iconStyle: {
+          borderColor: themeColors.textColor,
+        },
+      } : { show: false },
       grid: {
         left: '5%',
         right: '5%',
-        bottom: '10%',
-        top: title ? '15%' : '5%',
+        bottom: showLegend ? '15%' : '10%',
+        top: title ? '15%' : showToolbox ? '10%' : '5%',
         containLabel: true,
       },
       color: COLORS,
@@ -135,23 +186,27 @@ export function ChartCanvas({
           ...baseOption,
           xAxis: {
             type: 'value',
-            axisLine: { lineStyle: { color: '#374151' } },
-            splitLine: { lineStyle: { color: '#1f2937' } },
+            axisLine: { lineStyle: { color: themeColors.axisLine } },
+            splitLine: { lineStyle: { color: themeColors.splitLine } },
           },
           yAxis: {
             type: 'category',
             data: categories,
-            axisLine: { lineStyle: { color: '#374151' } },
+            axisLine: { lineStyle: { color: themeColors.axisLine } },
             axisLabel: {
               width: 150,
               overflow: 'truncate',
-              color: '#9ca3af',
+              color: themeColors.textColor,
             },
             inverse: true,
           },
+          dataZoom: [
+            { type: 'inside', yAxisIndex: 0 },
+          ],
           series: [
             {
               type: 'bar',
+              name: valueField,
               data: seriesData,
               itemStyle: {
                 color: COLORS[0],
@@ -173,17 +228,22 @@ export function ChartCanvas({
           xAxis: {
             type: 'category',
             data: categories,
-            axisLine: { lineStyle: { color: '#374151' } },
-            axisLabel: { color: '#9ca3af', rotate: 45 },
+            axisLine: { lineStyle: { color: themeColors.axisLine } },
+            axisLabel: { color: themeColors.textColor, rotate: 45 },
           },
           yAxis: {
             type: 'value',
-            axisLine: { lineStyle: { color: '#374151' } },
-            splitLine: { lineStyle: { color: '#1f2937' } },
+            axisLine: { lineStyle: { color: themeColors.axisLine } },
+            splitLine: { lineStyle: { color: themeColors.splitLine } },
           },
+          dataZoom: [
+            { type: 'inside' },
+            { type: 'slider', height: 20, bottom: showLegend ? 30 : 10 },
+          ],
           series: [
             {
               type: 'line',
+              name: valueField,
               data: seriesData,
               smooth: true,
               lineStyle: { width: 2 },
@@ -200,17 +260,22 @@ export function ChartCanvas({
             type: 'category',
             data: categories,
             boundaryGap: false,
-            axisLine: { lineStyle: { color: '#374151' } },
-            axisLabel: { color: '#9ca3af', rotate: 45 },
+            axisLine: { lineStyle: { color: themeColors.axisLine } },
+            axisLabel: { color: themeColors.textColor, rotate: 45 },
           },
           yAxis: {
             type: 'value',
-            axisLine: { lineStyle: { color: '#374151' } },
-            splitLine: { lineStyle: { color: '#1f2937' } },
+            axisLine: { lineStyle: { color: themeColors.axisLine } },
+            splitLine: { lineStyle: { color: themeColors.splitLine } },
           },
+          dataZoom: [
+            { type: 'inside' },
+            { type: 'slider', height: 20, bottom: showLegend ? 30 : 10 },
+          ],
           series: [
             {
               type: 'line',
+              name: valueField,
               data: seriesData,
               smooth: true,
               lineStyle: { width: 2 },
@@ -227,17 +292,21 @@ export function ChartCanvas({
           ...baseOption,
           xAxis: {
             type: 'value',
-            axisLine: { lineStyle: { color: '#374151' } },
-            splitLine: { lineStyle: { color: '#1f2937' } },
+            axisLine: { lineStyle: { color: themeColors.axisLine } },
+            splitLine: { lineStyle: { color: themeColors.splitLine } },
           },
           yAxis: {
             type: 'value',
-            axisLine: { lineStyle: { color: '#374151' } },
-            splitLine: { lineStyle: { color: '#1f2937' } },
+            axisLine: { lineStyle: { color: themeColors.axisLine } },
+            splitLine: { lineStyle: { color: themeColors.splitLine } },
           },
+          dataZoom: [
+            { type: 'inside' },
+          ],
           series: [
             {
               type: 'scatter',
+              name: 'Data',
               data: chartData.map((d, i) => [
                 d.value || i * 1000,
                 d.secondary || Math.random() * 10000,
@@ -255,24 +324,27 @@ export function ChartCanvas({
             {
               type: 'pie',
               radius: ['40%', '70%'],
-              center: ['50%', '55%'],
-              data: chartData.slice(0, 8).map((d, i) => ({
+              center: ['50%', '50%'],
+              data: chartData.slice(0, 10).map((d, i) => ({
                 name: (d as Record<string, unknown>)[categoryField] ?? (d as Record<string, unknown>).category,
                 value: (d as Record<string, unknown>)[valueField] ?? (d as Record<string, unknown>).value,
                 itemStyle: { color: COLORS[i % COLORS.length] },
               })),
               label: {
-                color: '#9ca3af',
+                color: themeColors.textColor,
                 fontSize: 11,
               },
               labelLine: {
-                lineStyle: { color: '#4b5563' },
+                lineStyle: { color: themeColors.axisLine },
+              },
+              emphasis: {
+                scaleSize: 10,
               },
             },
           ],
         };
 
-      case 'heatmap':
+      case 'heatmap': {
         const xData = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const yData = ['Morning', 'Noon', 'Afternoon', 'Evening', 'Night'];
         const heatmapData: [number, number, number][] = [];
@@ -286,12 +358,12 @@ export function ChartCanvas({
           xAxis: {
             type: 'category',
             data: xData,
-            axisLine: { lineStyle: { color: '#374151' } },
+            axisLine: { lineStyle: { color: themeColors.axisLine } },
           },
           yAxis: {
             type: 'category',
             data: yData,
-            axisLine: { lineStyle: { color: '#374151' } },
+            axisLine: { lineStyle: { color: themeColors.axisLine } },
           },
           visualMap: {
             min: 0,
@@ -301,9 +373,9 @@ export function ChartCanvas({
             left: 'center',
             bottom: '2%',
             inRange: {
-              color: ['#1f2937', COLORS[0]],
+              color: [isDark ? '#1f2937' : '#f3f4f6', COLORS[0]],
             },
-            textStyle: { color: '#9ca3af' },
+            textStyle: { color: themeColors.textColor },
           },
           series: [
             {
@@ -311,7 +383,163 @@ export function ChartCanvas({
               data: heatmapData,
               label: {
                 show: true,
-                color: '#f3f4f6',
+                color: themeColors.titleColor,
+              },
+            },
+          ],
+        };
+      }
+
+      case 'candlestick': {
+        // Generate OHLC data for demo
+        const ohlcData = chartData.slice(0, 30).map(() => {
+          const base = 100 + Math.random() * 50;
+          const open = base + (Math.random() - 0.5) * 10;
+          const close = base + (Math.random() - 0.5) * 10;
+          const high = Math.max(open, close) + Math.random() * 5;
+          const low = Math.min(open, close) - Math.random() * 5;
+          return [open.toFixed(2), close.toFixed(2), low.toFixed(2), high.toFixed(2)];
+        });
+        const dates = ohlcData.map((_, i) => `Day ${i + 1}`);
+        
+        return {
+          ...baseOption,
+          xAxis: {
+            type: 'category',
+            data: dates,
+            axisLine: { lineStyle: { color: themeColors.axisLine } },
+            axisLabel: { color: themeColors.textColor },
+          },
+          yAxis: {
+            type: 'value',
+            axisLine: { lineStyle: { color: themeColors.axisLine } },
+            splitLine: { lineStyle: { color: themeColors.splitLine } },
+            scale: true,
+          },
+          dataZoom: [
+            { type: 'inside', start: 0, end: 100 },
+            { type: 'slider', height: 20, bottom: showLegend ? 30 : 10 },
+          ],
+          series: [
+            {
+              type: 'candlestick',
+              name: 'OHLC',
+              data: ohlcData,
+              itemStyle: {
+                color: '#ef4444',
+                color0: '#10b981',
+                borderColor: '#ef4444',
+                borderColor0: '#10b981',
+              },
+            },
+          ],
+        };
+      }
+
+      case 'radar': {
+        const indicators = chartData.slice(0, 6).map((d) => ({
+          name: String((d as Record<string, unknown>)[categoryField] ?? (d as Record<string, unknown>).category),
+          max: Math.max(...seriesData.map(v => Number(v) || 0)) * 1.2,
+        }));
+        
+        return {
+          ...baseOption,
+          radar: {
+            indicator: indicators,
+            axisName: { color: themeColors.textColor },
+            splitLine: { lineStyle: { color: themeColors.splitLine } },
+            splitArea: { areaStyle: { color: ['transparent', isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'] } },
+          },
+          series: [
+            {
+              type: 'radar',
+              data: [
+                {
+                  value: seriesData.slice(0, 6),
+                  name: valueField,
+                  areaStyle: { opacity: 0.3 },
+                  lineStyle: { width: 2 },
+                },
+              ],
+            },
+          ],
+        };
+      }
+
+      case 'gauge': {
+        const gaugeValue = seriesData.length > 0 ? Number(seriesData[0]) : 0;
+        const maxValue = Math.max(...seriesData.map(v => Number(v) || 0));
+        
+        return {
+          ...baseOption,
+          series: [
+            {
+              type: 'gauge',
+              startAngle: 200,
+              endAngle: -20,
+              min: 0,
+              max: maxValue || 100,
+              splitNumber: 5,
+              itemStyle: {
+                color: COLORS[0],
+              },
+              progress: {
+                show: true,
+                width: 20,
+              },
+              pointer: {
+                show: true,
+                length: '60%',
+              },
+              axisLine: {
+                lineStyle: {
+                  width: 20,
+                  color: [[1, isDark ? '#1f2937' : '#e5e7eb']],
+                },
+              },
+              axisTick: {
+                lineStyle: { color: themeColors.textColor },
+              },
+              splitLine: {
+                lineStyle: { color: themeColors.textColor },
+              },
+              axisLabel: {
+                color: themeColors.textColor,
+                distance: 25,
+              },
+              detail: {
+                valueAnimation: true,
+                color: themeColors.titleColor,
+                fontSize: 24,
+                offsetCenter: [0, '70%'],
+              },
+              data: [{ value: gaugeValue, name: valueField }],
+            },
+          ],
+        };
+      }
+
+      case 'treemap':
+        return {
+          ...baseOption,
+          series: [
+            {
+              type: 'treemap',
+              data: chartData.slice(0, 15).map((d, i) => ({
+                name: (d as Record<string, unknown>)[categoryField] ?? (d as Record<string, unknown>).category,
+                value: (d as Record<string, unknown>)[valueField] ?? (d as Record<string, unknown>).value,
+                itemStyle: { color: COLORS[i % COLORS.length] },
+              })),
+              label: {
+                show: true,
+                color: '#fff',
+                fontSize: 11,
+              },
+              breadcrumb: {
+                itemStyle: {
+                  color: isDark ? '#374151' : '#e5e7eb',
+                  textStyle: { color: themeColors.textColor },
+                },
               },
             },
           ],
@@ -320,17 +548,20 @@ export function ChartCanvas({
       default:
         return baseOption;
     }
-  }, [chartType, chartData, title, rows, values]);
+  }, [chartType, chartData, title, rows, values, themeColors, isDark, showLegend, showToolbox, animation]);
 
   // Initialize and update chart
   useEffect(() => {
     if (!chartRef.current) return;
 
-    if (!chartInstance.current) {
-      chartInstance.current = echarts.init(chartRef.current, undefined, {
-        renderer: 'canvas',
-      });
+    // Dispose and recreate on theme change
+    if (chartInstance.current) {
+      chartInstance.current.dispose();
     }
+    
+    chartInstance.current = echarts.init(chartRef.current, isDark ? 'dark' : undefined, {
+      renderer: 'canvas',
+    });
 
     if (option) {
       chartInstance.current.setOption(option, true);
@@ -342,10 +573,13 @@ export function ChartCanvas({
     };
     window.addEventListener('resize', handleResize);
 
+    // Also resize on initial load after a short delay
+    setTimeout(handleResize, 100);
+
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  }, [option]);
+  }, [option, isDark]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -359,9 +593,9 @@ export function ChartCanvas({
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-800 flex items-center justify-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
             <svg
-              className="w-8 h-8 text-gray-600"
+              className="w-8 h-8 text-gray-400 dark:text-gray-600"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -374,7 +608,7 @@ export function ChartCanvas({
               />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-gray-300 mb-2">
+          <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
             Create a Visualization
           </h3>
           <p className="text-sm text-gray-500">

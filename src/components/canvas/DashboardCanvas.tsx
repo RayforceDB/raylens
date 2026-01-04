@@ -42,7 +42,7 @@ function WidgetContainer({
   onSelect: () => void;
   onRemove: () => void;
 }) {
-  const getChartType = () => {
+  const getChartType = (): 'bar' | 'line' | 'area' | 'scatter' | 'pie' | 'heatmap' | 'candlestick' | 'radar' | 'gauge' | 'treemap' => {
     const id = widget.component.id;
     if (id === 'bar-chart') return 'bar';
     if (id === 'line-chart') return 'line';
@@ -50,6 +50,8 @@ function WidgetContainer({
     if (id === 'scatter-chart') return 'scatter';
     if (id === 'pie-chart') return 'pie';
     if (id === 'heatmap') return 'heatmap';
+    if (id === 'candlestick') return 'candlestick';
+    if (id === 'treemap') return 'treemap';
     return 'bar';
   };
 

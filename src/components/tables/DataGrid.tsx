@@ -1,7 +1,16 @@
 /**
  * DataGrid - Interactive data table
  * 
- * Displays data from loaded dataset in Rayforce - NO FAKE DATA
+ * KX Dashboards-style tabular data display with:
+ * - Sorting (click column headers)
+ * - Column filtering (inline filters)
+ * - Conditional formatting (highlight rules)
+ * - Pagination
+ * - Column visibility toggle
+ * - CSV export
+ * - Real-time streaming support
+ * 
+ * @see https://code.kx.com/dashboards/datagrid/
  */
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
@@ -11,8 +20,8 @@ import { useRayLensStore } from '@core/store';
 export interface HighlightRule {
   id: string;
   column: string;
-  condition: 'gt' | 'lt' | 'eq' | 'gte' | 'lte' | 'between';
-  value: number;
+  condition: 'gt' | 'lt' | 'eq' | 'gte' | 'lte' | 'between' | 'contains';
+  value: number | string;
   value2?: number;
   color: string;
   backgroundColor: string;
@@ -31,14 +40,22 @@ const defaultRules: HighlightRule[] = [
 ];
 
 function evaluateRule(value: unknown, rule: HighlightRule): boolean {
+  // String contains check
+  if (rule.condition === 'contains') {
+    return String(value).toLowerCase().includes(String(rule.value).toLowerCase());
+  }
+  
+  // Numeric comparisons
   if (typeof value !== 'number') return false;
+  const numValue = rule.value as number;
+  
   switch (rule.condition) {
-    case 'gt': return value > rule.value;
-    case 'lt': return value < rule.value;
-    case 'gte': return value >= rule.value;
-    case 'lte': return value <= rule.value;
-    case 'eq': return value === rule.value;
-    case 'between': return rule.value2 !== undefined && value >= rule.value && value <= rule.value2;
+    case 'gt': return value > numValue;
+    case 'lt': return value < numValue;
+    case 'gte': return value >= numValue;
+    case 'lte': return value <= numValue;
+    case 'eq': return value === numValue;
+    case 'between': return rule.value2 !== undefined && value >= numValue && value <= rule.value2;
     default: return false;
   }
 }
@@ -77,12 +94,16 @@ interface DataGridProps {
   tableName?: string; // Override table name, otherwise uses dataset.id
   highlightRules?: HighlightRule[];
   enableDemo?: boolean; // Enable demo mode with streaming data
+  pageSize?: number; // Rows per page (0 = no pagination)
+  showToolbar?: boolean; // Show toolbar with export, filter toggle
 }
 
 export function DataGrid({ 
   tableName: tableNameProp,
   highlightRules = defaultRules,
   enableDemo = true,
+  pageSize: initialPageSize = 50,
+  showToolbar = true,
 }: DataGridProps) {
   const { bridge, status, dataset } = useRayLensStore();
   const [data, setData] = useState<Record<string, unknown>[]>([]);
@@ -91,6 +112,21 @@ export function DataGrid({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showDebug, setShowDebug] = useState(false);
   const [rules] = useState<HighlightRule[]>(highlightRules);
+  
+  // Filtering
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPageSize);
+  
+  // Column visibility
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
+  const [showColumnMenu, setShowColumnMenu] = useState(false);
+  
+  // Selection
+  const [selectedRow, setSelectedRow] = useState<number | null>(null);
   
   // State
   const [rfStatus, setRfStatus] = useState<'init' | 'loading' | 'ready' | 'error' | 'no-data' | 'demo'>('init');
@@ -428,10 +464,28 @@ export function DataGrid({
     };
   }, []);
   
+  // Visible columns (excluding hidden)
+  const visibleColumns = useMemo(() => {
+    return columns.filter(col => !hiddenColumns.has(col));
+  }, [columns, hiddenColumns]);
+  
+  // Filtered data
+  const filteredData = useMemo(() => {
+    if (Object.keys(columnFilters).length === 0) return data;
+    
+    return data.filter(row => {
+      return Object.entries(columnFilters).every(([col, filter]) => {
+        if (!filter) return true;
+        const val = String(row[col] ?? '').toLowerCase();
+        return val.includes(filter.toLowerCase());
+      });
+    });
+  }, [data, columnFilters]);
+  
   // Sorted data
   const sortedData = useMemo(() => {
-    if (!sortColumn) return data;
-    return [...data].sort((a, b) => {
+    if (!sortColumn) return filteredData;
+    return [...filteredData].sort((a, b) => {
       const aVal = a[sortColumn];
       const bVal = b[sortColumn];
       if (typeof aVal === 'number' && typeof bVal === 'number') {
@@ -441,7 +495,19 @@ export function DataGrid({
         ? String(aVal).localeCompare(String(bVal))
         : String(bVal).localeCompare(String(aVal));
     });
-  }, [data, sortColumn, sortDirection]);
+  }, [filteredData, sortColumn, sortDirection]);
+  
+  // Paginated data
+  const paginatedData = useMemo(() => {
+    if (pageSize === 0) return sortedData;
+    const start = (currentPage - 1) * pageSize;
+    return sortedData.slice(start, start + pageSize);
+  }, [sortedData, currentPage, pageSize]);
+  
+  const totalPages = useMemo(() => {
+    if (pageSize === 0) return 1;
+    return Math.ceil(sortedData.length / pageSize);
+  }, [sortedData.length, pageSize]);
   
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -450,6 +516,55 @@ export function DataGrid({
       setSortColumn(column);
       setSortDirection('desc');
     }
+  };
+  
+  const handleFilterChange = (column: string, value: string) => {
+    setColumnFilters(prev => ({ ...prev, [column]: value }));
+    setCurrentPage(1); // Reset to first page on filter
+  };
+  
+  const clearFilters = () => {
+    setColumnFilters({});
+    setCurrentPage(1);
+  };
+  
+  const toggleColumnVisibility = (column: string) => {
+    setHiddenColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(column)) {
+        next.delete(column);
+      } else {
+        next.add(column);
+      }
+      return next;
+    });
+  };
+  
+  // Export to CSV
+  const exportToCSV = () => {
+    const csvRows: string[] = [];
+    // Header
+    csvRows.push(visibleColumns.join(','));
+    // Data
+    sortedData.forEach(row => {
+      const values = visibleColumns.map(col => {
+        const val = row[col];
+        if (typeof val === 'string' && (val.includes(',') || val.includes('"'))) {
+          return `"${val.replace(/"/g, '""')}"`;
+        }
+        return String(val ?? '');
+      });
+      csvRows.push(values.join(','));
+    });
+    
+    const csv = csvRows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${tableName ?? 'data'}_export.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
   
   // Render status
@@ -520,32 +635,101 @@ export function DataGrid({
     }
   };
   
+  // Active filter count
+  const activeFilterCount = Object.values(columnFilters).filter(Boolean).length;
+  
   return (
     <div ref={containerRef} className="h-full flex flex-col bg-white dark:bg-gray-900 rounded overflow-hidden">
-      {/* Status Bar */}
-      <div className="flex items-center justify-between px-2 py-1.5 bg-gray-100 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-2">
-          {renderStatus()}
+      {/* Toolbar */}
+      {showToolbar && (
+        <div className="flex items-center justify-between px-2 py-1.5 bg-gray-100 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-2">
+            {renderStatus()}
+          </div>
+          
+          <div className="flex items-center gap-1">
+            {/* Filter toggle */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-2 py-1 text-2xs rounded transition-colors flex items-center gap-1 ${
+                showFilters || activeFilterCount > 0 
+                  ? 'bg-ray-600 text-white' 
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+              title="Toggle column filters"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              {activeFilterCount > 0 && <span>{activeFilterCount}</span>}
+            </button>
+            
+            {/* Column visibility */}
+            <div className="relative">
+              <button
+                onClick={() => setShowColumnMenu(!showColumnMenu)}
+                className={`px-2 py-1 text-2xs rounded transition-colors ${
+                  showColumnMenu ? 'bg-ray-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+                title="Column visibility"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                </svg>
+              </button>
+              {showColumnMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-20 min-w-[150px] max-h-64 overflow-y-auto">
+                  <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-2xs font-medium text-gray-600 dark:text-gray-400">Columns</span>
+                  </div>
+                  {columns.map(col => (
+                    <label key={col} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-xs">
+                      <input
+                        type="checkbox"
+                        checked={!hiddenColumns.has(col)}
+                        onChange={() => toggleColumnVisibility(col)}
+                        className="rounded text-ray-500"
+                      />
+                      <span className="text-gray-700 dark:text-gray-300 truncate">{col}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Export */}
+            <button
+              onClick={exportToCSV}
+              disabled={data.length === 0}
+              className="px-2 py-1 text-2xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
+              title="Export to CSV"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </button>
+            
+            {/* Refresh */}
+            <button
+              onClick={loadData}
+              className="px-2 py-1 text-2xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+              title="Refresh data"
+            >
+              ↻
+            </button>
+            
+            {/* Debug toggle */}
+            <button
+              onClick={() => setShowDebug(!showDebug)}
+              className={`px-2 py-1 text-2xs rounded transition-colors ${
+                showDebug ? 'bg-ray-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              Debug
+            </button>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-1">
-          <button
-            onClick={loadData}
-            className="px-2 py-1 text-2xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-            title="Refresh data"
-          >
-            ↻
-          </button>
-          <button
-            onClick={() => setShowDebug(!showDebug)}
-            className={`px-2 py-1 text-2xs rounded transition-colors ${
-              showDebug ? 'bg-ray-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            Debug
-          </button>
-        </div>
-      </div>
+      )}
       
       {/* Debug panel */}
       {showDebug && (
@@ -610,12 +794,13 @@ export function DataGrid({
         <div className="flex-1 overflow-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-gray-100 dark:bg-gray-800 z-10">
+              {/* Header row */}
               <tr>
-                {columns.map(col => (
+                {visibleColumns.map(col => (
                   <th
                     key={col}
                     onClick={() => handleSort(col)}
-                    className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors whitespace-nowrap"
+                    className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors whitespace-nowrap border-b border-gray-200 dark:border-gray-700"
                   >
                     <div className="flex items-center gap-1">
                       <span>{col}</span>
@@ -628,23 +813,121 @@ export function DataGrid({
                   </th>
                 ))}
               </tr>
-            </thead>
-            <tbody className="text-gray-700 dark:text-gray-300">
-              {sortedData.map((row, idx) => (
-                <tr key={idx} className="border-b border-gray-200/50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                  {columns.map(col => (
-                    <td
-                      key={col}
-                      className="px-3 py-1.5 whitespace-nowrap transition-colors"
-                      style={getCellStyle(row[col], col, rules)}
-                    >
-                      {formatValue(row[col])}
-                    </td>
+              {/* Filter row */}
+              {showFilters && (
+                <tr className="bg-gray-50 dark:bg-gray-800/50">
+                  {visibleColumns.map(col => (
+                    <th key={col} className="px-1 py-1">
+                      <input
+                        type="text"
+                        value={columnFilters[col] ?? ''}
+                        onChange={(e) => handleFilterChange(col, e.target.value)}
+                        placeholder={`Filter ${col}...`}
+                        className="w-full px-2 py-1 text-2xs font-normal bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600 focus:border-ray-500 focus:outline-none"
+                      />
+                    </th>
                   ))}
                 </tr>
-              ))}
+              )}
+            </thead>
+            <tbody className="text-gray-700 dark:text-gray-300">
+              {paginatedData.map((row, idx) => {
+                const globalIdx = (currentPage - 1) * pageSize + idx;
+                return (
+                  <tr 
+                    key={globalIdx} 
+                    onClick={() => setSelectedRow(globalIdx)}
+                    className={`border-b border-gray-200/50 dark:border-gray-800/50 transition-colors cursor-pointer ${
+                      selectedRow === globalIdx 
+                        ? 'bg-ray-50 dark:bg-ray-900/20' 
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-800/30'
+                    }`}
+                  >
+                    {visibleColumns.map(col => (
+                      <td
+                        key={col}
+                        className="px-3 py-1.5 whitespace-nowrap transition-colors"
+                        style={getCellStyle(row[col], col, rules)}
+                      >
+                        {formatValue(row[col])}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+        </div>
+      )}
+      
+      {/* Pagination / Footer */}
+      {(rfStatus === 'ready' || rfStatus === 'demo') && data.length > 0 && (
+        <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800/30 border-t border-gray-200 dark:border-gray-700 text-2xs">
+          <div className="flex items-center gap-2 text-gray-500">
+            <span>
+              {filteredData.length !== data.length && (
+                <span className="text-ray-600 dark:text-ray-400">{filteredData.length} of </span>
+              )}
+              {data.length} rows
+            </span>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="text-ray-600 dark:text-ray-400 hover:underline"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+          
+          {pageSize > 0 && totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="px-1.5 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 text-gray-600 dark:text-gray-400"
+              >
+                ««
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-1.5 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 text-gray-600 dark:text-gray-400"
+              >
+                «
+              </button>
+              <span className="text-gray-600 dark:text-gray-400">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-1.5 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 text-gray-600 dark:text-gray-400"
+              >
+                »
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-1.5 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 text-gray-600 dark:text-gray-400"
+              >
+                »»
+              </button>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="ml-2 px-1 py-0.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-gray-600 dark:text-gray-400"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={0}>All</option>
+              </select>
+            </div>
+          )}
         </div>
       )}
     </div>
