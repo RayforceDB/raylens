@@ -92,9 +92,16 @@ async function handleInit(): Promise<void> {
   try {
     console.log('[Worker] Initializing Rayforce WASM...');
 
-    const jsUrl = new URL('/rayforce/rayforce.js', self.location.origin).href;
-    const sdkUrl = new URL('/rayforce/rayforce.sdk.js', self.location.origin).href;
-    const wasmUrl = new URL('/rayforce/rayforce.wasm', self.location.origin).href;
+    // Get base path from worker location (handles GitHub Pages subpath)
+    const workerUrl = new URL(self.location.href);
+    const basePath = workerUrl.pathname.replace(/\/assets\/.*$/, '');
+    
+    const jsUrl = `${workerUrl.origin}${basePath}/rayforce/rayforce.js`;
+    const sdkUrl = `${workerUrl.origin}${basePath}/rayforce/rayforce.sdk.js`;
+    const wasmUrl = `${workerUrl.origin}${basePath}/rayforce/rayforce.wasm`;
+    
+    console.log('[Worker] Base path:', basePath);
+    console.log('[Worker] WASM URL:', wasmUrl);
     
     // Fetch and patch the WASM loader
     const response = await fetch(jsUrl);
