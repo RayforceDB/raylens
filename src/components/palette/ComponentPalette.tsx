@@ -204,6 +204,44 @@ const COMPONENTS: ComponentDefinition[] = [
       </svg>
     ),
   },
+  {
+    id: 'gauge',
+    name: 'Gauge',
+    category: 'controls',
+    description: 'Visual gauge/meter display',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <circle cx="12" cy="14" r="8" strokeDasharray="30 20" />
+        <path strokeLinecap="round" d="M12 14l-3-5" />
+        <circle cx="12" cy="14" r="1.5" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    id: 'range-slider',
+    name: 'Range Slider',
+    category: 'controls',
+    description: 'Range value selector',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" d="M4 12h16" />
+        <circle cx="8" cy="12" r="2" fill="currentColor" />
+        <circle cx="16" cy="12" r="2" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    id: 'button',
+    name: 'Button',
+    category: 'controls',
+    description: 'Action button',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <rect x="4" y="8" width="16" height="8" rx="2" />
+        <path strokeLinecap="round" d="M8 12h8" />
+      </svg>
+    ),
+  },
   // Layout
   {
     id: 'flex-panel',

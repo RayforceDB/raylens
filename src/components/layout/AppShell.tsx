@@ -14,6 +14,7 @@ import { DataPanel } from '../data/DataPanel';
 import { ComponentPalette, type ComponentDefinition } from '../palette/ComponentPalette';
 import { PropertyInspector } from '../inspector/PropertyInspector';
 import { DashboardCanvas, type DashboardWidget } from '../canvas/DashboardCanvas';
+import type { EncodedField } from '../viz/EncodingShelf';
 
 type LeftPanelTab = 'components' | 'data';
 
@@ -307,11 +308,14 @@ export function AppShell() {
               onTitleChange={handleTitleChange}
               dataSource={dataset ? 'local' : null}
               onDataSourceChange={() => {}}
-              encodings={{
-                x: selectedWidget?.encodings.rows[0],
-                y: selectedWidget?.encodings.columns[0],
-                color: selectedWidget?.encodings.color,
-              }}
+              encodings={(() => {
+                if (!selectedWidget) return {};
+                const enc: { x?: EncodedField; y?: EncodedField; color?: EncodedField } = {};
+                if (selectedWidget.encodings.rows[0]) enc.x = selectedWidget.encodings.rows[0];
+                if (selectedWidget.encodings.columns[0]) enc.y = selectedWidget.encodings.columns[0];
+                if (selectedWidget.encodings.color) enc.color = selectedWidget.encodings.color;
+                return enc;
+              })()}
               onEncodingChange={handleEncodingChange}
               availableFields={availableFields}
             />

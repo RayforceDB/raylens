@@ -7,7 +7,7 @@ import { useState, useCallback } from 'react';
 import GridLayout, { Layout } from 'react-grid-layout';
 import { ChartCanvas } from '../viz/ChartCanvas';
 import { DataGrid } from '../tables/DataGrid';
-import { FilterControl, DateRangePicker, DropdownControl, TextInput } from '../controls';
+import { FilterControl, DateRangePicker, DropdownControl, TextInput, GaugeControl, RangeSlider, ButtonControl } from '../controls';
 import { type ComponentDefinition, getComponentById } from '../palette/ComponentPalette';
 import type { EncodedField } from '../viz/EncodingShelf';
 
@@ -90,7 +90,19 @@ function WidgetContainer({
     }
     
     if (id === 'text-input') {
-      return <TextInput mode="expression" />;
+      return <TextInput type="expression" />;
+    }
+    
+    if (id === 'gauge') {
+      return <GaugeControl type="semicircle" title={widget.title} value={75} />;
+    }
+    
+    if (id === 'range-slider') {
+      return <RangeSlider title={widget.title} mode="range" />;
+    }
+    
+    if (id === 'button') {
+      return <ButtonControl label="Execute" variant="primary" />;
     }
     
     // Layout and other components - show placeholder
