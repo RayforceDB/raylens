@@ -521,9 +521,9 @@ export function DataGrid({
   };
   
   return (
-    <div ref={containerRef} className="h-full flex flex-col bg-gray-900 rounded overflow-hidden">
+    <div ref={containerRef} className="h-full flex flex-col bg-white dark:bg-gray-900 rounded overflow-hidden">
       {/* Status Bar */}
-      <div className="flex items-center justify-between px-2 py-1.5 bg-gray-800/50 border-b border-gray-700">
+      <div className="flex items-center justify-between px-2 py-1.5 bg-gray-100 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
           {renderStatus()}
         </div>
@@ -531,7 +531,7 @@ export function DataGrid({
         <div className="flex items-center gap-1">
           <button
             onClick={loadData}
-            className="px-2 py-1 text-2xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+            className="px-2 py-1 text-2xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
             title="Refresh data"
           >
             ↻
@@ -539,7 +539,7 @@ export function DataGrid({
           <button
             onClick={() => setShowDebug(!showDebug)}
             className={`px-2 py-1 text-2xs rounded transition-colors ${
-              showDebug ? 'bg-ray-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              showDebug ? 'bg-ray-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
             }`}
           >
             Debug
@@ -549,25 +549,25 @@ export function DataGrid({
       
       {/* Debug panel */}
       {showDebug && (
-        <div className="px-2 py-2 bg-gray-800/30 border-b border-gray-700 space-y-2 max-h-48 overflow-y-auto text-2xs">
+        <div className="px-2 py-2 bg-gray-50 dark:bg-gray-800/30 border-b border-gray-200 dark:border-gray-700 space-y-2 max-h-48 overflow-y-auto text-2xs">
           <div>
             <span className="text-gray-500">Table:</span>
-            <span className="ml-2 text-emerald-400">{tableName ?? '(none)'}</span>
+            <span className="ml-2 text-emerald-600 dark:text-emerald-400">{tableName ?? '(none)'}</span>
           </div>
           <div>
             <span className="text-gray-500">Last Rayfall:</span>
-            <code className="ml-2 text-emerald-400 break-all">{lastExpr || '(none)'}</code>
+            <code className="ml-2 text-emerald-600 dark:text-emerald-400 break-all">{lastExpr || '(none)'}</code>
           </div>
           <div>
             <span className="text-gray-500">Result preview:</span>
-            <pre className="mt-1 text-sky-400 break-all bg-gray-900 p-1 rounded max-h-20 overflow-auto">
+            <pre className="mt-1 text-sky-600 dark:text-sky-400 break-all bg-gray-100 dark:bg-gray-900 p-1 rounded max-h-20 overflow-auto">
               {lastResult ? lastResult.substring(0, 500) : '(none)'}
             </pre>
           </div>
           {lastError && (
             <div>
               <span className="text-gray-500">Error:</span>
-              <code className="ml-2 text-red-400 break-all">{lastError}</code>
+              <code className="ml-2 text-red-600 dark:text-red-400 break-all">{lastError}</code>
             </div>
           )}
         </div>
@@ -578,8 +578,8 @@ export function DataGrid({
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center p-4">
             <div className="text-3xl mb-3">📊</div>
-            <div className="text-sm text-gray-400 mb-2">No Data Loaded</div>
-            <div className="text-xs text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">No Data Loaded</div>
+            <div className="text-xs text-gray-500 dark:text-gray-600">
               Import a CSV file or load sample data
             </div>
           </div>
@@ -590,7 +590,7 @@ export function DataGrid({
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center p-4">
             <div className="text-3xl mb-3">⚠️</div>
-            <div className="text-sm text-red-400 mb-2">Error Loading Data</div>
+            <div className="text-sm text-red-600 dark:text-red-400 mb-2">Error Loading Data</div>
             <div className="text-xs text-gray-500 max-w-xs">{lastError}</div>
           </div>
         </div>
@@ -600,7 +600,7 @@ export function DataGrid({
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center p-4">
             <div className="w-8 h-8 border-2 border-ray-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <div className="text-sm text-gray-400">Loading from Rayforce...</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Loading from Rayforce...</div>
           </div>
         </div>
       )}
@@ -609,13 +609,13 @@ export function DataGrid({
       {(rfStatus === 'ready' || rfStatus === 'demo') && data.length > 0 && (
         <div className="flex-1 overflow-auto">
           <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-gray-800 z-10">
+            <thead className="sticky top-0 bg-gray-100 dark:bg-gray-800 z-10">
               <tr>
                 {columns.map(col => (
                   <th
                     key={col}
                     onClick={() => handleSort(col)}
-                    className="px-3 py-2 text-left font-medium text-gray-400 cursor-pointer hover:text-white transition-colors whitespace-nowrap"
+                    className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1">
                       <span>{col}</span>
@@ -629,9 +629,9 @@ export function DataGrid({
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="text-gray-700 dark:text-gray-300">
               {sortedData.map((row, idx) => (
-                <tr key={idx} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
+                <tr key={idx} className="border-b border-gray-200/50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                   {columns.map(col => (
                     <td
                       key={col}

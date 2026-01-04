@@ -120,18 +120,18 @@ export function DropdownControl({ column, multiple = false, onChange }: Dropdown
   }, [selectedColumn, selected]);
 
   return (
-    <div className="h-full flex flex-col bg-gray-900 rounded overflow-hidden" ref={dropdownRef}>
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900 rounded overflow-hidden" ref={dropdownRef}>
       {/* Header */}
-      <div className="px-3 py-2 bg-gray-800/50 border-b border-gray-700 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-300">Dropdown</span>
+      <div className="px-3 py-2 bg-gray-100 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Dropdown</span>
         {multiple && selected.length > 0 && (
-          <span className="text-2xs text-ray-400">{selected.length} selected</span>
+          <span className="text-2xs text-ray-600 dark:text-ray-400">{selected.length} selected</span>
         )}
       </div>
 
       {/* Column selector (if not fixed) */}
       {!column && (
-        <div className="px-2 py-2 border-b border-gray-700">
+        <div className="px-2 py-2 border-b border-gray-200 dark:border-gray-700">
           <label className="text-2xs text-gray-500 mb-1 block">Column</label>
           <select
             value={selectedColumn}
@@ -139,7 +139,7 @@ export function DropdownControl({ column, multiple = false, onChange }: Dropdown
               setSelectedColumn(e.target.value);
               setSelected([]);
             }}
-            className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 focus:border-ray-500 focus:outline-none"
+            className="w-full px-2 py-1.5 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-xs text-gray-700 dark:text-gray-300 focus:border-ray-500 focus:outline-none"
           >
             {columns.map((col) => (
               <option key={col} value={col}>
@@ -154,9 +154,9 @@ export function DropdownControl({ column, multiple = false, onChange }: Dropdown
       <div className="p-2">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-left flex items-center justify-between hover:border-gray-600 transition-colors"
+          className="w-full px-2 py-1.5 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-xs text-left flex items-center justify-between hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
         >
-          <span className={selected.length > 0 ? 'text-gray-300' : 'text-gray-500'}>
+          <span className={selected.length > 0 ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'}>
             {selected.length === 0
               ? 'Select...'
               : multiple
@@ -164,7 +164,7 @@ export function DropdownControl({ column, multiple = false, onChange }: Dropdown
               : selected[0]}
           </span>
           <svg
-            className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -175,32 +175,32 @@ export function DropdownControl({ column, multiple = false, onChange }: Dropdown
 
         {/* Dropdown menu */}
         {isOpen && (
-          <div className="mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg overflow-hidden">
+          <div className="mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded shadow-lg overflow-hidden">
             {/* Search */}
-            <div className="p-1.5 border-b border-gray-700">
+            <div className="p-1.5 border-b border-gray-200 dark:border-gray-700">
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search..."
-                className="w-full px-2 py-1 bg-gray-900 border border-gray-700 rounded text-xs text-gray-300 placeholder-gray-600 focus:border-ray-500 focus:outline-none"
+                className="w-full px-2 py-1 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded text-xs text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600 focus:border-ray-500 focus:outline-none"
                 autoFocus
               />
             </div>
 
             {/* Bulk actions (multiple) */}
             {multiple && (
-              <div className="px-1.5 py-1 border-b border-gray-700 flex gap-1">
+              <div className="px-1.5 py-1 border-b border-gray-200 dark:border-gray-700 flex gap-1">
                 <button
                   onClick={selectAll}
-                  className="text-2xs text-ray-400 hover:text-ray-300"
+                  className="text-2xs text-ray-600 dark:text-ray-400 hover:text-ray-500 dark:hover:text-ray-300"
                 >
                   Select all
                 </button>
-                <span className="text-gray-600">|</span>
+                <span className="text-gray-400 dark:text-gray-600">|</span>
                 <button
                   onClick={clearSelection}
-                  className="text-2xs text-gray-500 hover:text-gray-300"
+                  className="text-2xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                 >
                   Clear
                 </button>
@@ -218,8 +218,8 @@ export function DropdownControl({ column, multiple = false, onChange }: Dropdown
                   <button
                     key={opt}
                     onClick={() => toggleOption(opt)}
-                    className={`w-full px-2 py-1.5 text-xs text-left flex items-center gap-2 hover:bg-gray-700 transition-colors ${
-                      selected.includes(opt) ? 'text-ray-400' : 'text-gray-300'
+                    className={`w-full px-2 py-1.5 text-xs text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                      selected.includes(opt) ? 'text-ray-600 dark:text-ray-400' : 'text-gray-700 dark:text-gray-300'
                     }`}
                   >
                     {multiple && (
@@ -227,7 +227,7 @@ export function DropdownControl({ column, multiple = false, onChange }: Dropdown
                         className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${
                           selected.includes(opt)
                             ? 'bg-ray-500 border-ray-500'
-                            : 'border-gray-600'
+                            : 'border-gray-400 dark:border-gray-600'
                         }`}
                       >
                         {selected.includes(opt) && (
@@ -253,12 +253,12 @@ export function DropdownControl({ column, multiple = false, onChange }: Dropdown
             {selected.map((val) => (
               <span
                 key={val}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-ray-500/20 text-ray-400 rounded text-2xs"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-ray-500/20 text-ray-600 dark:text-ray-400 rounded text-2xs"
               >
                 {val}
                 <button
                   onClick={() => toggleOption(val)}
-                  className="hover:text-white"
+                  className="hover:text-ray-800 dark:hover:text-white"
                 >
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -272,9 +272,9 @@ export function DropdownControl({ column, multiple = false, onChange }: Dropdown
 
       {/* Rayfall expression */}
       {selected.length > 0 && (
-        <div className="px-2 py-2 border-t border-gray-700 bg-gray-800/30">
+        <div className="px-2 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30">
           <div className="text-2xs text-gray-500">Rayfall:</div>
-          <code className="text-2xs text-emerald-400 break-all">{rayfallExpr}</code>
+          <code className="text-2xs text-emerald-600 dark:text-emerald-400 break-all">{rayfallExpr}</code>
         </div>
       )}
     </div>

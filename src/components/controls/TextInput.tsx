@@ -110,16 +110,16 @@ export function TextInput({
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-900 rounded overflow-hidden">
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900 rounded overflow-hidden">
       {/* Header */}
-      <div className="px-3 py-2 bg-gray-800/50 border-b border-gray-700 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-300">
-          {mode === 'expression' ? 'q Console' : mode === 'search' ? 'Search' : 'Input'}
+      <div className="px-3 py-2 bg-gray-100 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+          {mode === 'expression' ? 'Rayfall Console' : mode === 'search' ? 'Search' : 'Input'}
         </span>
         {mode === 'expression' && history.length > 0 && (
           <button
             onClick={clearHistory}
-            className="text-2xs text-gray-500 hover:text-gray-300"
+            className="text-2xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
           >
             Clear history
           </button>
@@ -131,7 +131,7 @@ export function TextInput({
         <div className="relative">
           {mode === 'search' && (
             <svg
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -151,7 +151,7 @@ export function TextInput({
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             placeholder={placeholder ?? defaultPlaceholders[mode]}
-            className={`w-full py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 placeholder-gray-600 focus:border-ray-500 focus:outline-none ${
+            className={`w-full py-1.5 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-xs text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600 focus:border-ray-500 focus:outline-none ${
               mode === 'search' ? 'pl-8 pr-2' : 'px-2'
             } ${mode === 'expression' ? 'font-mono' : ''}`}
           />
@@ -169,7 +169,7 @@ export function TextInput({
 
       {/* History (expression mode) */}
       {mode === 'expression' && history.length > 0 && (
-        <div className="px-2 pb-2 border-b border-gray-700">
+        <div className="px-2 pb-2 border-b border-gray-200 dark:border-gray-700">
           <div className="text-2xs text-gray-500 mb-1">History (↑/↓):</div>
           <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
             {history.slice(0, 10).map((h, idx) => (
@@ -179,7 +179,7 @@ export function TextInput({
                   setValue(h);
                   inputRef.current?.focus();
                 }}
-                className="px-1.5 py-0.5 bg-gray-800 text-gray-400 hover:text-gray-300 rounded text-2xs font-mono truncate max-w-full"
+                className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300 rounded text-2xs font-mono truncate max-w-full"
               >
                 {h.length > 30 ? h.substring(0, 30) + '...' : h}
               </button>
@@ -208,26 +208,26 @@ export function TextInput({
       )}
 
       {/* Status */}
-      <div className="px-2 py-1.5 border-t border-gray-700 bg-gray-800/30 flex items-center justify-between">
+      <div className="px-2 py-1.5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30 flex items-center justify-between">
         {mode === 'expression' ? (
           <>
             <span className="text-2xs text-gray-500">
               {bridge && status === 'ready' ? (
                 <span className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
                   Connected
                 </span>
               ) : (
                 <span className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
                   Disconnected
                 </span>
               )}
             </span>
-            <span className="text-2xs text-gray-600">Press Enter to execute</span>
+            <span className="text-2xs text-gray-500 dark:text-gray-600">Press Enter to execute</span>
           </>
         ) : (
-          <span className="text-2xs text-gray-600">
+          <span className="text-2xs text-gray-500 dark:text-gray-600">
             {mode === 'search' ? 'Type to search' : 'Enter value'}
           </span>
         )}

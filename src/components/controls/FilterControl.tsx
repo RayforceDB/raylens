@@ -107,14 +107,14 @@ export function FilterControl({ onFilterChange }: FilterControlProps) {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-900 rounded overflow-hidden">
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900 rounded overflow-hidden">
       {/* Header */}
-      <div className="px-3 py-2 bg-gray-800/50 border-b border-gray-700 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-300">Data Filter</span>
+      <div className="px-3 py-2 bg-gray-100 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Data Filter</span>
         {conditions.length > 0 && (
           <button
             onClick={clearAll}
-            className="text-2xs text-gray-500 hover:text-red-400"
+            className="text-2xs text-gray-500 hover:text-red-500 dark:hover:text-red-400"
           >
             Clear all
           </button>
@@ -123,22 +123,22 @@ export function FilterControl({ onFilterChange }: FilterControlProps) {
 
       {/* Active conditions */}
       {conditions.length > 0 && (
-        <div className="px-2 py-2 border-b border-gray-700 space-y-1">
+        <div className="px-2 py-2 border-b border-gray-200 dark:border-gray-700 space-y-1">
           {conditions.map((cond, idx) => (
             <div
               key={idx}
               className="flex items-center gap-1 px-2 py-1 bg-ray-500/10 rounded text-2xs"
             >
-              <span className="text-ray-400 font-medium">{cond.column}</span>
+              <span className="text-ray-600 dark:text-ray-400 font-medium">{cond.column}</span>
               <span className="text-gray-500">
                 {operators.find((o) => o.value === cond.operator)?.label}
               </span>
-              <span className="text-gray-300 truncate flex-1">
+              <span className="text-gray-700 dark:text-gray-300 truncate flex-1">
                 {Array.isArray(cond.value) ? cond.value.join(', ') : String(cond.value)}
               </span>
               <button
                 onClick={() => removeCondition(idx)}
-                className="text-gray-500 hover:text-red-400 p-0.5"
+                className="text-gray-500 hover:text-red-500 dark:hover:text-red-400 p-0.5"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -157,7 +157,7 @@ export function FilterControl({ onFilterChange }: FilterControlProps) {
           <select
             value={selectedColumn}
             onChange={(e) => setSelectedColumn(e.target.value)}
-            className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 focus:border-ray-500 focus:outline-none"
+            className="w-full px-2 py-1.5 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-xs text-gray-700 dark:text-gray-300 focus:border-ray-500 focus:outline-none"
           >
             <option value="">Select column...</option>
             {columns.map((col) => (
@@ -174,7 +174,7 @@ export function FilterControl({ onFilterChange }: FilterControlProps) {
           <select
             value={selectedOperator}
             onChange={(e) => setSelectedOperator(e.target.value as FilterCondition['operator'])}
-            className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 focus:border-ray-500 focus:outline-none"
+            className="w-full px-2 py-1.5 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-xs text-gray-700 dark:text-gray-300 focus:border-ray-500 focus:outline-none"
           >
             {operators.map((op) => (
               <option key={op.value} value={op.value}>
@@ -206,7 +206,7 @@ export function FilterControl({ onFilterChange }: FilterControlProps) {
                     className={`px-1.5 py-0.5 rounded text-2xs transition-colors ${
                       filterValue.split(',').map((v) => v.trim()).includes(val)
                         ? 'bg-ray-500 text-white'
-                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                     }`}
                   >
                     {val}
@@ -218,7 +218,7 @@ export function FilterControl({ onFilterChange }: FilterControlProps) {
                 value={filterValue}
                 onChange={(e) => setFilterValue(e.target.value)}
                 placeholder="Or type values..."
-                className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 placeholder-gray-600 focus:border-ray-500 focus:outline-none"
+                className="w-full px-2 py-1.5 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-xs text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600 focus:border-ray-500 focus:outline-none"
               />
             </div>
           ) : (
@@ -227,7 +227,7 @@ export function FilterControl({ onFilterChange }: FilterControlProps) {
               value={filterValue}
               onChange={(e) => setFilterValue(e.target.value)}
               placeholder="Enter value..."
-              className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 placeholder-gray-600 focus:border-ray-500 focus:outline-none"
+              className="w-full px-2 py-1.5 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-xs text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-600 focus:border-ray-500 focus:outline-none"
             />
           )}
         </div>
@@ -236,7 +236,7 @@ export function FilterControl({ onFilterChange }: FilterControlProps) {
         <button
           onClick={addCondition}
           disabled={!selectedColumn || !filterValue}
-          className="w-full px-3 py-1.5 bg-ray-600 hover:bg-ray-500 disabled:bg-gray-800 disabled:text-gray-600 text-white text-xs font-medium rounded transition-colors"
+          className="w-full px-3 py-1.5 bg-ray-600 hover:bg-ray-500 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-600 text-white text-xs font-medium rounded transition-colors"
         >
           Add Condition
         </button>
@@ -244,9 +244,9 @@ export function FilterControl({ onFilterChange }: FilterControlProps) {
 
       {/* Rayfall expression preview */}
       {conditions.length > 0 && (
-        <div className="px-2 py-2 border-t border-gray-700 bg-gray-800/30">
+        <div className="px-2 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30">
           <div className="text-2xs text-gray-500 mb-1">Rayfall where:</div>
-          <code className="text-2xs text-emerald-400 break-all">
+          <code className="text-2xs text-emerald-600 dark:text-emerald-400 break-all">
             {`(select {... from: t where: ${generateRayfallExpression()}})`}
           </code>
         </div>

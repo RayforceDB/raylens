@@ -86,25 +86,25 @@ export function DateRangePicker({ onChange, initialRange }: DateRangePickerProps
   }, [range]);
 
   return (
-    <div className="h-full flex flex-col bg-gray-900 rounded overflow-hidden">
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900 rounded overflow-hidden">
       {/* Header */}
-      <div className="px-3 py-2 bg-gray-800/50 border-b border-gray-700 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-300">Date Range</span>
+      <div className="px-3 py-2 bg-gray-100 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Date Range</span>
         <button
           onClick={toggleLive}
           className={`flex items-center gap-1 px-2 py-0.5 rounded text-2xs transition-colors ${
             isLive
-              ? 'bg-emerald-500/20 text-emerald-400'
-              : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+              ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+              : 'bg-gray-200 dark:bg-gray-800 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
           }`}
         >
-          <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-gray-600'}`} />
+          <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-500 dark:bg-emerald-400 animate-pulse' : 'bg-gray-400 dark:bg-gray-600'}`} />
           Live
         </button>
       </div>
 
       {/* Presets */}
-      <div className="px-2 py-2 border-b border-gray-700">
+      <div className="px-2 py-2 border-b border-gray-200 dark:border-gray-700">
         <div className="flex flex-wrap gap-1">
           {PRESETS.map((preset) => (
             <button
@@ -113,7 +113,7 @@ export function DateRangePicker({ onChange, initialRange }: DateRangePickerProps
               className={`px-2 py-1 rounded text-2xs transition-colors ${
                 activePreset === preset.minutes
                   ? 'bg-ray-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-300'
               }`}
             >
               {preset.label}
@@ -130,7 +130,7 @@ export function DateRangePicker({ onChange, initialRange }: DateRangePickerProps
             type="datetime-local"
             value={formatForInput(range.start)}
             onChange={handleStartChange}
-            className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 focus:border-ray-500 focus:outline-none"
+            className="w-full px-2 py-1.5 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-xs text-gray-700 dark:text-gray-300 focus:border-ray-500 focus:outline-none"
           />
         </div>
         <div>
@@ -140,21 +140,21 @@ export function DateRangePicker({ onChange, initialRange }: DateRangePickerProps
             value={formatForInput(range.end)}
             onChange={handleEndChange}
             disabled={isLive}
-            className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 focus:border-ray-500 focus:outline-none disabled:opacity-50"
+            className="w-full px-2 py-1.5 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-xs text-gray-700 dark:text-gray-300 focus:border-ray-500 focus:outline-none disabled:opacity-50"
           />
         </div>
       </div>
 
       {/* Duration display */}
-      <div className="px-2 py-2 border-t border-gray-700 bg-gray-800/30">
+      <div className="px-2 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30">
         <div className="flex items-center justify-between text-2xs">
           <span className="text-gray-500">Duration:</span>
-          <span className="text-gray-300">
+          <span className="text-gray-700 dark:text-gray-300">
             {formatDuration(range.end.getTime() - range.start.getTime())}
           </span>
         </div>
         <div className="text-2xs text-gray-500 mt-1">Rayfall:</div>
-        <code className="text-2xs text-emerald-400 break-all">{rayfallExpr}</code>
+        <code className="text-2xs text-emerald-600 dark:text-emerald-400 break-all">{rayfallExpr}</code>
       </div>
     </div>
   );
