@@ -40,9 +40,9 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Set base path for GitHub Pages (repo name)
-          # Update this if your repo has a different name
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          # Base path: use / for custom domains, /repo-name/ for github.io
+          # Since we have custom domain raylens.rayforcedb.com, use /
+          VITE_BASE_PATH: /
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
