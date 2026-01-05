@@ -364,13 +364,31 @@ function WidgetWrapper({ widget, isSelected, onSelect }: WidgetWrapperProps) {
   } : gridData;
   
   const renderWidget = () => {
-    // Show error if query failed (strip ANSI escape codes)
+    // Show error if query failed
     if (boundQuery?.lastError) {
+      // Strip ANSI escape codes
       const cleanError = boundQuery.lastError.replace(/\x1b\[[0-9;]*m/g, '').trim();
+      
+      // Parse error: extract main message and details
+      const lines = cleanError.split('\n');
+      const errorLine = lines.find(l => l.includes('Error:') || l.includes('error:')) || lines[0];
+      const mainError = errorLine?.replace(/^[×x]\s*/, '').replace(/Error:\s*/i, '').trim() || 'Query failed';
+      
+      // Find the "not found" or specific error
+      const detailLine = lines.find(l => l.includes('not found') || l.includes('├─') || l.includes('│'));
+      const detail = detailLine?.replace(/[├│└─×]\s*/g, '').trim();
+      
       return (
         <div className="widget-error">
-          <div className="error-icon">⚠</div>
-          <div className="error-message">{cleanError}</div>
+          <div className="error-header">
+            <svg className="error-icon" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1a7 7 0 100 14A7 7 0 008 1zM7 4h2v5H7V4zm0 6h2v2H7v-2z"/>
+            </svg>
+            <span>{mainError}{detail ? `: ${detail}` : ''}</span>
+          </div>
+          <div className="error-content">
+            <pre className="error-message">{cleanError}</pre>
+          </div>
         </div>
       );
     }
