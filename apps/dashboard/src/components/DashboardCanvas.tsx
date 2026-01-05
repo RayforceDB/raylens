@@ -89,8 +89,14 @@ export function DashboardCanvas() {
         const currentStatus = useLensStore.getState().connectionStatus;
         if (currentStatus !== 'connected') return;
 
+        // Check if any widget using this query is paused
+        const state = useLensStore.getState();
+        const dashboard = state.workspace.dashboards.find(d => d.id === state.workspace.activeDashboardId);
+        const widgetUsingQuery = dashboard?.widgets.find(w => w.binding?.queryId === queryId);
+        if (widgetUsingQuery?.config?.paused) return;
+
         // Get fresh query data from store at execution time
-        const currentQuery = useLensStore.getState().workspace.queries.find(q => q.id === queryId);
+        const currentQuery = state.workspace.queries.find(q => q.id === queryId);
         if (!currentQuery) return;
 
         setQueryRunning(queryId, true);
@@ -204,7 +210,16 @@ function WidgetWrapper({ widget, isSelected, onSelect }: WidgetWrapperProps) {
   const [isResizing, setIsResizing] = useState(false);
   const [localSize, setLocalSize] = useState({ w: widget.position.w, h: widget.position.h });
   const resizeRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
-  
+
+  const isPaused = widget.config?.paused === true;
+
+  const togglePause = useCallback(() => {
+    if (!activeDashboardId) return;
+    updateWidget(activeDashboardId, widget.id, {
+      config: { ...widget.config, paused: !isPaused }
+    });
+  }, [activeDashboardId, widget.id, widget.config, isPaused, updateWidget]);
+
   const isDevMode = appMode === 'dev';
   
   // Get bound query data - extract specific fields to prevent unnecessary re-renders
@@ -360,12 +375,41 @@ function WidgetWrapper({ widget, isSelected, onSelect }: WidgetWrapperProps) {
   // Use page data if available, otherwise use bound query result
   const gridData = pageData || boundQuery?.lastResult;
   const isServerSidePagination = boundQuery ? isSimpleTableQuery(boundQuery.code) !== null : false;
-  
+
   // Inject totalRows into result for server-side pagination
   const dataWithRowCount = gridData && totalRows !== undefined ? {
     ...gridData as object,
     rowCount: totalRows,
   } : gridData;
+
+  // Calculate grid dimensions for display in header
+  const gridDimensions = useMemo(() => {
+    if (widget.type !== 'grid' || !boundQuery?.lastResult) return null;
+
+    const result = boundQuery.lastResult as { type?: string; columns?: string[]; toJS?: () => unknown; data?: unknown };
+    let rows = 0;
+    let cols = 0;
+
+    if (result.type === 'table' && result.columns) {
+      cols = result.columns.length;
+      const jsData = result.toJS?.();
+      rows = Array.isArray(jsData) ? jsData.length : 0;
+    } else if (result.type === 'vector') {
+      cols = 1;
+      const arr = result.toJS?.() || result.data;
+      rows = Array.isArray(arr) ? arr.length : 0;
+    } else if (Array.isArray(result.data)) {
+      rows = result.data.length;
+      cols = result.data.length > 0 && typeof result.data[0] === 'object'
+        ? Object.keys(result.data[0] as object).length
+        : 1;
+    }
+
+    // Use totalRows if available (server-side pagination)
+    if (totalRows !== undefined) rows = totalRows;
+
+    return rows > 0 || cols > 0 ? { rows, cols } : null;
+  }, [widget.type, boundQuery?.lastResult, totalRows]);
   
   const renderWidget = () => {
     // Show error if query failed
@@ -438,7 +482,14 @@ function WidgetWrapper({ widget, isSelected, onSelect }: WidgetWrapperProps) {
     >
       {/* Widget header - minimal in live mode */}
       <div className={`widget-header ${isDevMode ? '' : 'live-mode'}`}>
-        <span className="widget-title">{widget.title}</span>
+        <div className="widget-title-row">
+          <span className="widget-title">{widget.title}</span>
+          {gridDimensions && (
+            <span className="widget-dimensions">
+              {gridDimensions.rows.toLocaleString()} rows x {gridDimensions.cols} cols
+            </span>
+          )}
+        </div>
         
         {isDevMode ? (
           <div className="widget-actions">
@@ -459,7 +510,27 @@ function WidgetWrapper({ widget, isSelected, onSelect }: WidgetWrapperProps) {
                 {widget.binding?.refreshInterval ? ` (${widget.binding.refreshInterval / 1000}s)` : ''}
               </span>
             )}
-            <button 
+            {widget.binding?.refreshInterval && widget.binding.refreshInterval > 0 && (
+              <button
+                className={`widget-action widget-pause-toggle ${isPaused ? 'paused' : ''}`}
+                title={isPaused ? 'Resume auto-refresh' : 'Pause auto-refresh'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePause();
+                }}
+              >
+                {isPaused ? (
+                  <svg viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"/>
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+                  </svg>
+                )}
+              </button>
+            )}
+            <button
               className="widget-action"
               title="Configure"
               onClick={(e) => {

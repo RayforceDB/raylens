@@ -8,12 +8,27 @@ interface ChartWidgetProps {
   chartType: string;
 }
 
+// OHLC data for candlestick charts
+interface OHLCData {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
 // Helper to safely extract data from RayforceResult or raw data
-function extractData(rawData: unknown): { categories: string[]; values: number[]; series: { name: string; data: number[] }[] } {
+function extractData(rawData: unknown): {
+  categories: string[];
+  values: number[];
+  series: { name: string; data: number[] }[];
+  ohlc?: OHLCData[];
+} {
   let categories: string[] = [];
   let values: number[] = [];
   let series: { name: string; data: number[] }[] = [];
-  
+  let ohlc: OHLCData[] | undefined;
+
   if (!rawData) {
     return { categories, values, series };
   }
@@ -56,14 +71,48 @@ function extractData(rawData: unknown): { categories: string[]; values: number[]
     // Array of objects (table rows)
     if (data.length > 0 && typeof data[0] === 'object' && data[0] !== null) {
       const rows = data as Record<string, unknown>[];
-      const keys = Object.keys(rows[0]);
-      
+      const keys = Object.keys(rows[0]).map(k => k.toLowerCase());
+      const keysOriginal = Object.keys(rows[0]);
+
+      // Check for OHLC data (candlestick)
+      const hasOHLC = ['open', 'high', 'low', 'close'].every(k =>
+        keys.includes(k) || keys.includes(k[0]) // Support both 'open' and 'o'
+      );
+
+      if (hasOHLC) {
+        // Find the time/category column
+        const timeKey = keysOriginal.find(k => {
+          const kl = k.toLowerCase();
+          return kl === 'time' || kl === 'ts' || kl === 'timestamp' || kl === 'date' || kl === 't';
+        }) || keysOriginal[0];
+
+        // Map column names (support both full names and abbreviations)
+        const findKey = (names: string[]) =>
+          keysOriginal.find(k => names.includes(k.toLowerCase())) || '';
+
+        const openKey = findKey(['open', 'o']);
+        const highKey = findKey(['high', 'h']);
+        const lowKey = findKey(['low', 'l']);
+        const closeKey = findKey(['close', 'c']);
+
+        ohlc = rows.map(r => ({
+          time: String(r[timeKey] ?? ''),
+          open: Number(r[openKey] ?? 0),
+          high: Number(r[highKey] ?? 0),
+          low: Number(r[lowKey] ?? 0),
+          close: Number(r[closeKey] ?? 0),
+        }));
+
+        categories = ohlc.map(d => d.time);
+        return { categories, values, series, ohlc };
+      }
+
       // Find string/category column and numeric columns
       const firstRow = rows[0];
       let categoryKey: string | null = null;
       const numericKeys: string[] = [];
-      
-      for (const key of keys) {
+
+      for (const key of keysOriginal) {
         const val = firstRow[key];
         if (typeof val === 'string' && !categoryKey) {
           categoryKey = key;
@@ -71,14 +120,14 @@ function extractData(rawData: unknown): { categories: string[]; values: number[]
           numericKeys.push(key);
         }
       }
-      
+
       // Use first column as category if no string column found
       if (!categoryKey) {
-        categoryKey = keys[0];
+        categoryKey = keysOriginal[0];
       }
-      
+
       categories = rows.map(r => String(r[categoryKey!] ?? ''));
-      
+
       if (numericKeys.length === 1) {
         values = rows.map(r => Number(r[numericKeys[0]] ?? 0));
       } else if (numericKeys.length > 1) {
@@ -90,7 +139,7 @@ function extractData(rawData: unknown): { categories: string[]; values: number[]
       } else {
         // No numeric column, try to use values as numbers
         values = rows.map(r => {
-          const v = r[keys[1] || keys[0]];
+          const v = r[keysOriginal[1] || keysOriginal[0]];
           return typeof v === 'number' ? v : 0;
         });
       }
@@ -139,14 +188,14 @@ function extractData(rawData: unknown): { categories: string[]; values: number[]
     values = [data];
   }
   
-  return { categories, values, series };
+  return { categories, values, series, ohlc };
 }
 
 export function ChartWidget({ data, chartType }: ChartWidgetProps) {
   const option = useMemo((): EChartsOption => {
-    const { categories, values, series } = extractData(data);
-    
-    if (categories.length === 0 && values.length === 0) {
+    const { categories, values, series, ohlc } = extractData(data);
+
+    if (categories.length === 0 && values.length === 0 && !ohlc?.length) {
       return {
         title: {
           text: 'No data',
@@ -294,13 +343,25 @@ export function ChartWidget({ data, chartType }: ChartWidgetProps) {
         
       case 'candle':
       case 'candlestick':
+        // ECharts candlestick format: [open, close, low, high]
+        const candleData = ohlc
+          ? ohlc.map(d => [d.open, d.close, d.low, d.high])
+          : values.map(v => [v, v * 1.01, v * 0.98, v * 1.02]); // Fallback for non-OHLC data
+        const candleCategories = ohlc ? ohlc.map(d => d.time) : categories;
+
         return {
           ...baseOption,
+          grid: { left: 60, right: 20, top: 40, bottom: 60 },
           xAxis: {
             type: 'category',
-            data: categories,
+            data: candleCategories,
             axisLine: axisLineStyle,
-            axisLabel: baseTextStyle,
+            axisLabel: {
+              ...baseTextStyle,
+              rotate: 45,
+              fontSize: 10,
+            },
+            splitLine: { show: false },
           },
           yAxis: {
             type: 'value',
@@ -309,14 +370,31 @@ export function ChartWidget({ data, chartType }: ChartWidgetProps) {
             axisLabel: baseTextStyle,
             splitLine: splitLineStyle,
           },
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'cross' },
+            backgroundColor: '#1a1a24',
+            borderColor: '#2a2a3a',
+            textStyle: { color: '#e8e8ec' },
+            formatter: (params: unknown) => {
+              const p = (params as { data: number[]; name: string }[])[0];
+              if (!p) return '';
+              const [open, close, low, high] = p.data;
+              return `<b>${p.name}</b><br/>
+                Open: ${open?.toFixed(2)}<br/>
+                High: ${high?.toFixed(2)}<br/>
+                Low: ${low?.toFixed(2)}<br/>
+                Close: ${close?.toFixed(2)}`;
+            },
+          },
           series: [{
             type: 'candlestick' as const,
-            data: values.map((v) => [v, v * 1.02, v * 0.98, v * 1.01]),
+            data: candleData,
             itemStyle: {
-              color: '#22c55e',
-              color0: '#ef4444',
-              borderColor: '#22c55e',
-              borderColor0: '#ef4444',
+              color: '#22c55e',      // Up candle fill
+              color0: '#ef4444',     // Down candle fill
+              borderColor: '#22c55e', // Up candle border
+              borderColor0: '#ef4444', // Down candle border
             },
           }],
         };

@@ -289,9 +289,43 @@ function WidgetsPanel() {
 function SettingsPanel() {
   const serverUrl = useLensStore(state => state.serverUrl);
   const setServerUrl = useLensStore(state => state.setServerUrl);
-  
+  const loadWorkspace = useLensStore(state => state.loadWorkspace);
+  const [loadingDemo, setLoadingDemo] = useState(false);
+
+  const handleLoadDemo = async () => {
+    setLoadingDemo(true);
+    try {
+      const response = await fetch('/workspaces/trading-demo.json');
+      if (response.ok) {
+        const workspace = await response.json();
+        loadWorkspace(workspace);
+        toast.success('Demo workspace loaded!');
+      } else {
+        toast.error('Failed to load demo workspace');
+      }
+    } catch (err) {
+      console.error('[Settings] Failed to load demo:', err);
+      toast.error('Failed to load demo workspace');
+    }
+    setLoadingDemo(false);
+  };
+
   return (
     <div className="settings-panel">
+      <div className="settings-group">
+        <div className="settings-group-title">Workspace</div>
+        <button
+          className="settings-btn"
+          onClick={handleLoadDemo}
+          disabled={loadingDemo}
+        >
+          {loadingDemo ? 'Loading...' : 'Load Demo Workspace'}
+        </button>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+          Replaces current workspace with the trading demo including candlestick chart.
+        </p>
+      </div>
+
       <div className="settings-group">
         <div className="settings-group-title">Connection</div>
         <div className="settings-row">

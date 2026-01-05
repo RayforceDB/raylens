@@ -7,31 +7,19 @@
     {
       "id": "q-trades-recent",
       "name": "Recent Trades",
-      "code": "10#trades",
+      "code": "(take trades -20)",
       "isRunning": false
     },
     {
       "id": "q-trade-count",
       "name": "Trade Count",
-      "code": "count trades",
+      "code": "(count trades)",
       "isRunning": false
     },
     {
-      "id": "q-quotes-recent",
-      "name": "Recent Quotes",
-      "code": "5#quotes",
-      "isRunning": false
-    },
-    {
-      "id": "q-quote-count",
-      "name": "Quote Count", 
-      "code": "count quotes",
-      "isRunning": false
-    },
-    {
-      "id": "q-simple-calc",
-      "name": "Simple Calculation",
-      "code": "(+ 100 200)",
+      "id": "q-ohlc-candles",
+      "name": "Price Candles",
+      "code": "(select {t: (first (eval (as 'symbol \"timestamp\"))) open: (first price) high: (max price) low: (min price) close: (last price) from: trades by: (xbar (eval (as 'symbol \"timestamp\")) 5000000000)})",
       "isRunning": false
     }
   ],
@@ -52,7 +40,19 @@
             "autoRun": true
           },
           "config": {},
-          "position": { "x": 0, "y": 0, "w": 8, "h": 5 }
+          "position": { "x": 0, "y": 0, "w": 7, "h": 6 }
+        },
+        {
+          "id": "w-candlestick",
+          "type": "chart",
+          "title": "Price Candles",
+          "binding": {
+            "queryId": "q-ohlc-candles",
+            "refreshInterval": 5000,
+            "autoRun": true
+          },
+          "config": { "chartType": "candlestick" },
+          "position": { "x": 7, "y": 0, "w": 5, "h": 4 }
         },
         {
           "id": "w-trade-count",
@@ -60,35 +60,11 @@
           "title": "Total Trades",
           "binding": {
             "queryId": "q-trade-count",
-            "refreshInterval": 10000,
-            "autoRun": true
-          },
-          "config": { "fontSize": 56, "color": "var(--accent-blue)" },
-          "position": { "x": 8, "y": 0, "w": 4, "h": 2 }
-        },
-        {
-          "id": "w-quote-count",
-          "type": "text",
-          "title": "Total Quotes",
-          "binding": {
-            "queryId": "q-quote-count",
-            "refreshInterval": 10000,
-            "autoRun": true
-          },
-          "config": { "fontSize": 56, "color": "var(--accent-green)" },
-          "position": { "x": 8, "y": 2, "w": 4, "h": 2 }
-        },
-        {
-          "id": "w-quotes-grid",
-          "type": "grid",
-          "title": "Recent Quotes",
-          "binding": {
-            "queryId": "q-quotes-recent",
             "refreshInterval": 5000,
             "autoRun": true
           },
-          "config": {},
-          "position": { "x": 0, "y": 5, "w": 12, "h": 4 }
+          "config": { "fontSize": 64, "suffix": " trades" },
+          "position": { "x": 7, "y": 4, "w": 5, "h": 2 }
         }
       ]
     }
