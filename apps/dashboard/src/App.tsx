@@ -100,9 +100,9 @@ export function App() {
     });
     
     return () => {
-      rayforceClient.off('connected', handleConnected);
-      rayforceClient.off('disconnected', handleDisconnected);
-      rayforceClient.off('error', handleError);
+      rayforceClient?.off('connected', handleConnected);
+      rayforceClient?.off('disconnected', handleDisconnected);
+      rayforceClient?.off('error', handleError);
       rayforceClient?.disconnect();
     };
   }, [sdkReady, isAuthenticated]); // Only depend on sdkReady and isAuthenticated

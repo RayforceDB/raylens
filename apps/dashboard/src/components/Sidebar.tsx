@@ -97,7 +97,6 @@ function QueriesPanel() {
   const setQueryResult = useLensStore(state => state.setQueryResult);
   const setQueryError = useLensStore(state => state.setQueryError);
   const setQueryRunning = useLensStore(state => state.setQueryRunning);
-  const connectionStatus = useLensStore(state => state.connectionStatus);
   
   const runQuery = async (queryId: string, code: string) => {
     if (!rayforceClient) {

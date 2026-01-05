@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
 import type { RayforceResult } from '../../lib/rayforce';
@@ -41,13 +41,13 @@ function extractData(rawData: unknown): { categories: string[]; values: number[]
     // Try to get JS data
     if (result.toJS) {
       try {
-        data = result.toJS();
+        data = result.toJS() as Record<string, unknown>;
       } catch (e) {
         console.error('[Chart] toJS failed:', e);
         return { categories, values, series };
       }
     } else if (result.data !== undefined) {
-      data = result.data;
+      data = result.data as Record<string, unknown>;
     }
   }
   
@@ -311,7 +311,7 @@ export function ChartWidget({ data, chartType }: ChartWidgetProps) {
           },
           series: [{
             type: 'candlestick' as const,
-            data: values.map((v, i) => [v, v * 1.02, v * 0.98, v * 1.01]),
+            data: values.map((v) => [v, v * 1.02, v * 0.98, v * 1.01]),
             itemStyle: {
               color: '#22c55e',
               color0: '#ef4444',

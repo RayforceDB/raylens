@@ -87,10 +87,6 @@ interface Table extends RayObject {
   toRows(): Record<string, unknown>[];
 }
 
-interface RayforceGlobal {
-  init(options?: { wasmPath?: string; locateFile?: (file: string) => string }): Promise<RayforceSDK>;
-  Types: typeof Types;
-}
 
 // IPC header constants (from rayforce/core/serde.h)
 // Header: prefix(4) version(1) flags(1) endian(1) msgtype(1) size(8) = 16 bytes
@@ -109,7 +105,7 @@ export interface RayforceResult {
   source?: 'local' | 'remote';
   
   /** Get column as TypedArray (zero-copy) */
-  getColumn?: (name: string) => Float64Array | Int32Array | BigInt64Array | Uint8Array | null;
+  getColumn?: (name: string) => ArrayBufferView | null;
   /** Convert to JS (use sparingly, triggers full copy) */
   toJS?: () => unknown;
 }
@@ -166,7 +162,6 @@ export class RayforceClient {
   private pendingRequests: Map<number, { resolve: (value: RayforceResult) => void; reject: (error: Error) => void }> = new Map();
   private requestId = 0;
   private sdk: RayforceSDK | null = null;
-  private wasmModule: EmscriptenModule | null = null;
 
   constructor() {
     // SDK loaded on demand
@@ -189,7 +184,6 @@ export class RayforceClient {
     }
     
     this.sdk = sdk;
-    this.wasmModule = sdk._wasm;
     
     logInfo('Rayforce', `SDK loaded, version: ${this.sdk.version}`);
   }
@@ -429,7 +423,6 @@ export class RayforceClient {
       setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id);
-          const execTime = performance.now() - startTime;
           logError('Query', `[REMOTE] Timeout after ${timeout}ms`);
           reject(new Error(`Query timeout after ${timeout}ms`));
         }
@@ -600,7 +593,7 @@ export class RayforceClient {
   }
   
   private parseVector(view: DataView, offset: number, type: number): RayforceResult {
-    const attrs = view.getUint8(offset);
+    // Skip attrs byte
     offset += 1;
     const len = Number(view.getBigInt64(offset, true));
     offset += 8;
@@ -693,7 +686,7 @@ export class RayforceClient {
           columns,
           rowCount,
           toJS: () => rows,
-          getColumn: (name: string) => wasmTable.col(name)?.toTypedArray?.() || null,
+          getColumn: (name: string) => wasmTable.col(name)?.typedArray || null,
         };
       } catch {
         // Fall back to JS-only result
@@ -725,7 +718,7 @@ export class RayforceClient {
     // Simple dict: parse keys and values
     const { data: keys, bytesRead: keyBytes } = this.parseAnyWithSize(view, offset);
     offset += keyBytes;
-    const { data: values, bytesRead: valBytes } = this.parseAnyWithSize(view, offset);
+    const { data: values } = this.parseAnyWithSize(view, offset);
     
     // If keys are symbols and values are vectors, create a table-like structure
     if (Array.isArray(keys) && Array.isArray(values)) {
@@ -994,7 +987,6 @@ export class RayforceClient {
     }
     
     const type = Math.abs(obj.type);
-    const sdk = this.sdk!;
     
     // Table
     if (type === Types.TABLE) {
@@ -1011,7 +1003,7 @@ export class RayforceClient {
         getColumn: (name: string) => {
           const col = table.col(name);
           if (!col) return null;
-          return col.toTypedArray?.() || null;
+          return col.typedArray || null;
         },
         // Lazy JS conversion
         toJS: () => table.toRows(),
@@ -1020,11 +1012,12 @@ export class RayforceClient {
     
     // Vector
     if (obj.isVector) {
+      const vec = obj as Vector;
       return {
         type: 'vector',
         rayObject: obj,
         // Zero-copy access for numeric vectors
-        getColumn: () => obj.toTypedArray?.() || null,
+        getColumn: () => vec.typedArray || null,
         toJS: () => obj.toJS(),
       };
     }

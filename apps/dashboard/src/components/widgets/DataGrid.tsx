@@ -12,7 +12,7 @@ interface CustomHeaderProps extends IHeaderParams {
 }
 
 function CustomHeader(props: CustomHeaderProps) {
-  const { displayName, columnType, column, enableSorting, setSort } = props;
+  const { displayName, columnType, enableSorting, setSort } = props;
   const [sortState, setSortState] = useState<'asc' | 'desc' | null>(null);
   
   const handleSort = () => {
@@ -68,9 +68,6 @@ export interface CellColorRule {
 // Default color rules - empty by default, user can configure via Widget Config
 const DEFAULT_COLOR_RULES: CellColorRule[] = [];
 
-// User-configurable color palettes for categorical columns
-// Empty by default - colors only applied when explicitly configured via Widget Config
-const DEFAULT_CATEGORY_COLORS: Record<string, string> = {};
 
 // ============================================================================
 // CELL RENDERERS
@@ -578,7 +575,7 @@ export function DataGridWidget({
       // Apply user-configured column colors (from columnColorConfigs)
       const colorConfig = columnColorConfigs.find(cc => cc.column === name);
       if (colorConfig) {
-        def.cellStyle = (params: CellClassParams) => {
+        def.cellStyle = (params: CellClassParams): Record<string, string | number> | null | undefined => {
           const val = params.value;
           
           if (colorConfig.type === 'preset' && colorConfig.preset) {
@@ -605,7 +602,7 @@ export function DataGridWidget({
                       matches = numVal >= (rule.min ?? -Infinity) && numVal < (rule.max ?? Infinity);
                       break;
                   }
-                  if (matches) return rule.style as React.CSSProperties;
+                  if (matches) return rule.style as Record<string, string | number>;
                 }
               }
             }
@@ -687,8 +684,7 @@ export function DataGridWidget({
           suppressRowClickSelection={true}
           headerHeight={32}
           rowHeight={28}
-          getRowId={(params: GetRowIdParams) => params.data?.__rowId || params.data?.id || String(params.rowIndex)}
-          loading={isLoading}
+          getRowId={(params: GetRowIdParams) => params.data?.__rowId || params.data?.id || String(Math.random())}
         />
       </div>
       

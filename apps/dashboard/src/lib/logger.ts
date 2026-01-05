@@ -122,7 +122,7 @@ class Logger {
     // Use original console to avoid infinite loop
     const msg = `[${source}] ${message}`;
     if (data !== undefined) {
-      (console as Record<string, (...args: unknown[]) => void>)[consoleMethod](msg, data);
+      (console as unknown as Record<string, (...args: unknown[]) => void>)[consoleMethod](msg, data);
     }
   }
 

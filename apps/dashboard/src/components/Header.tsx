@@ -20,7 +20,6 @@ export function Header({ onConnect }: HeaderProps) {
   const serverUrl = useLensStore(state => state.serverUrl);
   const setServerUrl = useLensStore(state => state.setServerUrl);
   const appMode = useLensStore(state => state.appMode);
-  const toggleAppMode = useLensStore(state => state.toggleAppMode);
   const user = useLensStore(state => state.user);
   const logout = useLensStore(state => state.logout);
   

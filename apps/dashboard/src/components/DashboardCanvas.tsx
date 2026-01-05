@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { useLensStore, Widget as WidgetType, Query } from '../store';
+import { useLensStore, Widget as WidgetType } from '../store';
 import { shallow } from 'zustand/shallow';
 import { DataGridWidget, paginateQuery, countQuery } from './widgets/DataGrid';
 import { ChartWidget } from './widgets/Chart';
@@ -14,9 +14,6 @@ export function DashboardCanvas() {
   const setQueryResult = useLensStore(state => state.setQueryResult);
   const setQueryError = useLensStore(state => state.setQueryError);
   const setQueryRunning = useLensStore(state => state.setQueryRunning);
-  const appMode = useLensStore(state => state.appMode);
-  
-  const isDevMode = appMode === 'dev';
   
   const activeDashboard = useLensStore(state => 
     state.workspace.dashboards.find(d => d.id === state.workspace.activeDashboardId)
@@ -45,7 +42,7 @@ export function DashboardCanvas() {
           console.log(`[DashboardCanvas] Running query "${query.name}" (${queryId.slice(0,8)}): ${query.code}`);
           setQueryRunning(query.id, true);
           try {
-            const result = await rayforceClient.execute(query.code);
+            const result = await rayforceClient!.execute(query.code);
             console.log(`[DashboardCanvas] Query "${query.name}" result:`, result.type, result.type === 'error' ? result.data : '');
             if (result.type === 'error') {
               setQueryError(query.id, String(result.data));
@@ -91,7 +88,7 @@ export function DashboardCanvas() {
         
         setQueryRunning(queryId, true);
         try {
-          const result = await rayforceClient.execute(currentQuery.code);
+          const result = await rayforceClient!.execute(currentQuery.code);
           if (result.type === 'error') {
             setQueryError(queryId, String(result.data));
           } else {
@@ -355,7 +352,7 @@ function WidgetWrapper({ widget, isSelected, onSelect }: WidgetWrapperProps) {
   
   // Use page data if available, otherwise use bound query result
   const gridData = pageData || boundQuery?.lastResult;
-  const isServerSidePagination = boundQuery && isSimpleTableQuery(boundQuery.code) !== null;
+  const isServerSidePagination = boundQuery ? isSimpleTableQuery(boundQuery.code) !== null : false;
   
   // Inject totalRows into result for server-side pagination
   const dataWithRowCount = gridData && totalRows !== undefined ? {

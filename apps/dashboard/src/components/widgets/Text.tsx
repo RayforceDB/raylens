@@ -1,4 +1,3 @@
-import React from 'react';
 import type { RayforceResult } from '../../lib/rayforce';
 
 interface TextWidgetProps {
