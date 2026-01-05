@@ -226,6 +226,8 @@ export interface RayforceResult {
   /** JS representation (lazy, only computed when needed) */
   data?: unknown;
   columns?: string[];
+  /** Rayforce type names for each column (e.g., 'i64', 'f64', 'sym', 'ts') */
+  columnTypes?: Record<string, string>;
   rowCount?: number;
   executionTime?: number;
   source?: 'local' | 'remote';
@@ -235,6 +237,23 @@ export interface RayforceResult {
   /** Convert to JS (use sparingly, triggers full copy) */
   toJS?: () => unknown;
 }
+
+// Map Rayforce type codes to display names
+const TYPE_NAMES: Record<number, string> = {
+  [Types.LIST]: 'list',
+  [Types.B8]: 'b8',
+  [Types.U8]: 'u8',
+  [Types.I16]: 'i16',
+  [Types.I32]: 'i32',
+  [Types.I64]: 'i64',
+  [Types.SYMBOL]: 'sym',
+  [Types.DATE]: 'date',
+  [Types.TIME]: 'time',
+  [Types.TIMESTAMP]: 'ts',
+  [Types.F64]: 'f64',
+  [Types.GUID]: 'guid',
+  [Types.C8]: 'c8',
+};
 
 // Query directive parsing
 interface QueryDirectives {
@@ -900,7 +919,13 @@ export class RayforceClient {
   
   private parseTable(view: DataView, offset: number): RayforceResult {
     // Use the internal parser
-    const { columns, columnData } = this.parseTableInternal(view, offset);
+    const { columns, columnData, columnTypes: typeIds } = this.parseTableInternal(view, offset);
+    
+    // Build column type map
+    const columnTypes: Record<string, string> = {};
+    for (let c = 0; c < columns.length; c++) {
+      columnTypes[columns[c]] = TYPE_NAMES[typeIds[c]] || `t${typeIds[c]}`;
+    }
     
     // Convert to row format
     const rowCount = columnData[0]?.length || 0;
@@ -926,6 +951,7 @@ export class RayforceClient {
           type: 'table',
           rayObject: wasmTable,
           columns,
+          columnTypes,
           rowCount,
           toJS: () => rows,
           getColumn: (name: string) => wasmTable.col(name)?.typedArray || null,
@@ -939,6 +965,7 @@ export class RayforceClient {
       type: 'table',
       data: rows,
       columns,
+      columnTypes,
       rowCount,
       toJS: () => rows,
     };
@@ -985,6 +1012,13 @@ export class RayforceClient {
     // Combine key and value columns
     const allColumns = [...keyTableResult.columns, ...valueTableResult.columns];
     const allColumnData = [...keyTableResult.columnData, ...valueTableResult.columnData];
+    const allTypeIds = [...keyTableResult.columnTypes, ...valueTableResult.columnTypes];
+    
+    // Build column type map
+    const columnTypes: Record<string, string> = {};
+    for (let c = 0; c < allColumns.length; c++) {
+      columnTypes[allColumns[c]] = TYPE_NAMES[allTypeIds[c]] || `t${allTypeIds[c]}`;
+    }
     
     // Convert to row format
     const rowCount = allColumnData[0]?.length || 0;
@@ -1002,6 +1036,7 @@ export class RayforceClient {
       type: 'table',
       data: rows,
       columns: allColumns,
+      columnTypes,
       rowCount,
       toJS: () => rows,
     };
@@ -1102,6 +1137,7 @@ export class RayforceClient {
   private parseTableInternal(view: DataView, offset: number): { 
     columns: string[]; 
     columnData: unknown[][]; 
+    columnTypes: number[];
     bytesRead: number;
   } {
     const startOffset = offset;
@@ -1140,6 +1176,7 @@ export class RayforceClient {
     offset += 1;
     
     const columnData: unknown[][] = [];
+    const columnTypes: number[] = [];
     if (valsType === Types.LIST) {
       offset += 1; // attrs
       const valsLen = Number(view.getBigInt64(offset, true));
@@ -1148,6 +1185,8 @@ export class RayforceClient {
       for (let i = 0; i < valsLen && offset < view.byteLength; i++) {
         const colType = view.getInt8(offset);
         offset += 1;
+        
+        columnTypes.push(colType); // Track actual type
         
         if (colType > 0 && colType < 20) {
           offset += 1; // attrs
@@ -1179,7 +1218,7 @@ export class RayforceClient {
       }
     }
     
-    return { columns, columnData, bytesRead: offset - startOffset };
+    return { columns, columnData, columnTypes, bytesRead: offset - startOffset };
   }
   
   private parseList(view: DataView, offset: number): RayforceResult {

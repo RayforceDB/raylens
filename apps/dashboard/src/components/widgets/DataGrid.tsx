@@ -116,8 +116,50 @@ function FlagRenderer({ value }: ICellRendererParams) {
   return flag ? <span style={{ marginRight: 6 }}>{flag} {value}</span> : <span>{value}</span>;
 }
 
+// Badge colors for common trading values
+const BADGE_COLORS: Record<string, { bg: string; text: string }> = {
+  // Buy/Sell
+  'BUY': { bg: '#166534', text: '#4ade80' },
+  'SELL': { bg: '#991b1b', text: '#f87171' },
+  'B': { bg: '#166534', text: '#4ade80' },
+  'S': { bg: '#991b1b', text: '#f87171' },
+  // Order status
+  'FILLED': { bg: '#1e40af', text: '#60a5fa' },
+  'PARTIAL': { bg: '#854d0e', text: '#fbbf24' },
+  'PENDING': { bg: '#854d0e', text: '#fbbf24' },
+  'NEW': { bg: '#0e7490', text: '#22d3ee' },
+  'OPEN': { bg: '#0e7490', text: '#22d3ee' },
+  'CANCELLED': { bg: '#7f1d1d', text: '#fca5a5' },
+  'REJECTED': { bg: '#7f1d1d', text: '#fca5a5' },
+  'ACTIVE': { bg: '#166534', text: '#4ade80' },
+  // Order types
+  'MARKET': { bg: '#4c1d95', text: '#c4b5fd' },
+  'LIMIT': { bg: '#1e3a5f', text: '#7dd3fc' },
+  'STOP': { bg: '#713f12', text: '#fcd34d' },
+};
+
 function BadgeRenderer({ value }: ICellRendererParams) {
-  // Simple text display - colors only applied via column config
+  const strVal = String(value || '').toUpperCase();
+  const colors = BADGE_COLORS[strVal];
+  
+  if (colors) {
+    return (
+      <span style={{
+        display: 'inline-block',
+        padding: '2px 8px',
+        borderRadius: '4px',
+        fontSize: '11px',
+        fontWeight: 600,
+        letterSpacing: '0.5px',
+        backgroundColor: colors.bg,
+        color: colors.text,
+        textTransform: 'uppercase',
+      }}>
+        {value}
+      </span>
+    );
+  }
+  
   return <span>{value}</span>;
 }
 
@@ -470,43 +512,58 @@ export function DataGridWidget({
       paginatedRows = rows.slice(start, end);
     }
     
-    // Detect column types
-    const columnTypes: Record<string, 'number' | 'string' | 'currency' | 'status' | 'array' | 'time'> = {};
+    // Get actual Rayforce column types from result if available
+    const rayforceColumnTypes: Record<string, string> = result?.columnTypes || {};
+    
+    // Detect column categories for rendering (from actual Rayforce types or fallback to value detection)
+    const columnCategories: Record<string, 'number' | 'string' | 'currency' | 'status' | 'array' | 'time'> = {};
     const sampleRow = rows[0] || {};
     
+    // Column names that typically contain buy/sell or status values
+    const statusColumnNames = ['side', 'action', 'direction', 'type', 'status', 'state', 'order_type', 'ordertype'];
+    
     for (const col of columns) {
+      const rfType = rayforceColumnTypes[col];
       const val = sampleRow[col];
       const colLower = col.toLowerCase();
       
-      if (Array.isArray(val)) {
-        columnTypes[col] = 'array';
-      } else if (colLower.includes('pair') || colLower.includes('sym') || colLower.includes('currency') || colLower === 'ccy') {
-        columnTypes[col] = 'currency';
-      } else if (colLower.includes('status') || colLower.includes('state') || colLower.includes('side') || colLower === 'type') {
-        columnTypes[col] = 'status';
-      } else if (colLower.includes('time') || colLower.includes('date') || colLower === 'ts') {
-        columnTypes[col] = 'time';
-      } else if (typeof val === 'number') {
-        columnTypes[col] = 'number';
+      // Check if column name suggests status/badge values
+      const isStatusColumn = statusColumnNames.some(name => colLower === name || colLower.endsWith('_' + name));
+      
+      // Check if value looks like a badge value (buy/sell etc)
+      const strVal = String(val || '').toUpperCase();
+      const isBadgeValue = strVal in BADGE_COLORS;
+      
+      // Map Rayforce type to category for rendering
+      if (rfType === 'list') {
+        columnCategories[col] = 'array';
+      } else if (isStatusColumn || isBadgeValue) {
+        columnCategories[col] = 'status'; // Status columns get badge rendering
+      } else if (rfType === 'sym') {
+        columnCategories[col] = 'currency'; // sym columns get flag rendering
+      } else if (rfType === 'ts' || rfType === 'date' || rfType === 'time') {
+        columnCategories[col] = 'time';
+      } else if (rfType === 'i16' || rfType === 'i32' || rfType === 'i64' || rfType === 'f64') {
+        columnCategories[col] = 'number';
+      } else if (rfType) {
+        columnCategories[col] = 'string';
       } else {
-        columnTypes[col] = 'string';
+        // Fallback to value-based detection
+        if (Array.isArray(val)) {
+          columnCategories[col] = 'array';
+        } else if (typeof val === 'number') {
+          columnCategories[col] = 'number';
+        } else {
+          columnCategories[col] = 'string';
+        }
       }
     }
     
-    // Map internal types to display types (like Rayforce fmt.c)
-    const typeDisplayMap: Record<string, string> = {
-      'number': 'f64',
-      'string': 'c8',
-      'currency': 'sym',
-      'status': 'sym',
-      'array': 'list',
-      'time': 'ts',
-    };
-    
     // Build column definitions
     const columnDefs: ColDef[] = columns.map(name => {
-      const colType = columnTypes[name];
-      const typeLabel = typeDisplayMap[colType] || colType;
+      const category = columnCategories[name];
+      // Use actual Rayforce type for display, fallback to category-based guess
+      const typeLabel = rayforceColumnTypes[name] || category || 'str';
       const def: ColDef = {
         field: name,
         headerName: name,
@@ -520,18 +577,18 @@ export function DataGridWidget({
         headerComponentParams: { columnType: typeLabel },
       };
       
-      if (colType === 'currency' && showFlags) {
+      if (category === 'currency' && showFlags) {
         def.cellRenderer = FlagRenderer;
         def.minWidth = 120;
-      } else if (colType === 'status' && showBadges) {
+      } else if (category === 'status' && showBadges) {
         def.cellRenderer = BadgeRenderer;
         def.minWidth = 100;
-      } else if (colType === 'array' && showSparklines) {
+      } else if (category === 'array' && showSparklines) {
         def.cellRenderer = SparklineRenderer;
         def.minWidth = 100;
         def.sortable = false;
         def.filter = false;
-      } else if (colType === 'number') {
+      } else if (category === 'number') {
         if (flashPrices && (name.toLowerCase().includes('price') || name.toLowerCase().includes('rate'))) {
           def.cellRenderer = PriceRenderer;
         }
@@ -564,9 +621,11 @@ export function DataGridWidget({
           if (Number.isInteger(val)) return val.toLocaleString();
           return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
         };
-      } else if (colType === 'time') {
+      } else if (category === 'time') {
         def.valueFormatter = (params: ValueFormatterParams) => {
           const val = params.value;
+          // Rayforce already formats timestamps as strings, just display them
+          if (typeof val === 'string') return val;
           if (typeof val === 'number') return new Date(val).toLocaleTimeString();
           return val;
         };
