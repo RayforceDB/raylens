@@ -14,17 +14,19 @@ export function DashboardCanvas() {
   const setQueryResult = useLensStore(state => state.setQueryResult);
   const setQueryError = useLensStore(state => state.setQueryError);
   const setQueryRunning = useLensStore(state => state.setQueryRunning);
-  
-  const activeDashboard = useLensStore(state => 
+  const connectionStatus = useLensStore(state => state.connectionStatus);
+
+  const activeDashboard = useLensStore(state =>
     state.workspace.dashboards.find(d => d.id === state.workspace.activeDashboardId)
   );
   const queries = useLensStore(state => state.workspace.queries);
-  
+
   // Run auto-run queries once on mount - deduplicated by query ID
   const [queriesInitialized, setQueriesInitialized] = useState(false);
-  
+
   useEffect(() => {
-    if (!rayforceClient || queriesInitialized) return;
+    // Wait for connection to be established before running auto-run queries
+    if (!rayforceClient || queriesInitialized || connectionStatus !== 'connected') return;
     
     // Collect unique query IDs that need auto-run
     const autoRunQueryIds = new Set<string>();
@@ -59,15 +61,16 @@ export function DashboardCanvas() {
     };
     
     runQueries();
-  }, [queriesInitialized]);
+  }, [queriesInitialized, connectionStatus]);
   
   // Set up refresh intervals - deduplicated by query ID
   useEffect(() => {
-    if (!rayforceClient || !activeDashboard) return;
-    
+    // Wait for connection before setting up refresh intervals
+    if (!rayforceClient || !activeDashboard || connectionStatus !== 'connected') return;
+
     // Collect all queries that need refresh and find shortest interval for each
     const queryIntervals = new Map<string, number>();
-    
+
     for (const widget of activeDashboard.widgets) {
       if (widget.binding?.refreshInterval && widget.binding.refreshInterval > 0 && widget.binding.queryId) {
         const existingInterval = queryIntervals.get(widget.binding.queryId);
@@ -76,16 +79,20 @@ export function DashboardCanvas() {
         }
       }
     }
-    
+
     // Create one interval per unique query
     const intervals: ReturnType<typeof setInterval>[] = [];
-    
+
     queryIntervals.forEach((intervalMs, queryId) => {
       const interval = setInterval(async () => {
+        // Check connection status at execution time
+        const currentStatus = useLensStore.getState().connectionStatus;
+        if (currentStatus !== 'connected') return;
+
         // Get fresh query data from store at execution time
         const currentQuery = useLensStore.getState().workspace.queries.find(q => q.id === queryId);
         if (!currentQuery) return;
-        
+
         setQueryRunning(queryId, true);
         try {
           const result = await rayforceClient!.execute(currentQuery.code);
@@ -98,14 +105,14 @@ export function DashboardCanvas() {
           setQueryError(queryId, (err as Error).message);
         }
       }, intervalMs);
-      
+
       intervals.push(interval);
     });
-    
+
     return () => {
       intervals.forEach(clearInterval);
     };
-  }, [activeDashboard?.id]); // Only re-setup intervals when dashboard changes
+  }, [activeDashboard?.id, connectionStatus]); // Re-setup intervals when dashboard or connection changes
   
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();

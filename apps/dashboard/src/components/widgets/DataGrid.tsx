@@ -116,50 +116,134 @@ function FlagRenderer({ value }: ICellRendererParams) {
   return flag ? <span style={{ marginRight: 6 }}>{flag} {value}</span> : <span>{value}</span>;
 }
 
-// Badge colors for common trading values
-const BADGE_COLORS: Record<string, { bg: string; text: string }> = {
-  // Buy/Sell
-  'BUY': { bg: '#166534', text: '#4ade80' },
-  'SELL': { bg: '#991b1b', text: '#f87171' },
-  'B': { bg: '#166534', text: '#4ade80' },
-  'S': { bg: '#991b1b', text: '#f87171' },
+// Badge colors for common trading values - pill style with gradients
+const BADGE_COLORS: Record<string, {
+  gradient: string;
+  text: string;
+  glow: string;
+  border?: string;
+}> = {
+  // Buy/Sell - vibrant pill style
+  'BUY': {
+    gradient: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+    text: '#ffffff',
+    glow: 'rgba(34, 197, 94, 0.4)',
+    border: 'rgba(74, 222, 128, 0.3)',
+  },
+  'SELL': {
+    gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+    text: '#ffffff',
+    glow: 'rgba(239, 68, 68, 0.4)',
+    border: 'rgba(248, 113, 113, 0.3)',
+  },
+  'B': {
+    gradient: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+    text: '#ffffff',
+    glow: 'rgba(34, 197, 94, 0.4)',
+    border: 'rgba(74, 222, 128, 0.3)',
+  },
+  'S': {
+    gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+    text: '#ffffff',
+    glow: 'rgba(239, 68, 68, 0.4)',
+    border: 'rgba(248, 113, 113, 0.3)',
+  },
   // Order status
-  'FILLED': { bg: '#1e40af', text: '#60a5fa' },
-  'PARTIAL': { bg: '#854d0e', text: '#fbbf24' },
-  'PENDING': { bg: '#854d0e', text: '#fbbf24' },
-  'NEW': { bg: '#0e7490', text: '#22d3ee' },
-  'OPEN': { bg: '#0e7490', text: '#22d3ee' },
-  'CANCELLED': { bg: '#7f1d1d', text: '#fca5a5' },
-  'REJECTED': { bg: '#7f1d1d', text: '#fca5a5' },
-  'ACTIVE': { bg: '#166534', text: '#4ade80' },
+  'FILLED': {
+    gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+    text: '#ffffff',
+    glow: 'rgba(59, 130, 246, 0.35)',
+    border: 'rgba(96, 165, 250, 0.3)',
+  },
+  'PARTIAL': {
+    gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+    text: '#ffffff',
+    glow: 'rgba(245, 158, 11, 0.35)',
+    border: 'rgba(251, 191, 36, 0.3)',
+  },
+  'PENDING': {
+    gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+    text: '#ffffff',
+    glow: 'rgba(245, 158, 11, 0.35)',
+    border: 'rgba(251, 191, 36, 0.3)',
+  },
+  'NEW': {
+    gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+    text: '#ffffff',
+    glow: 'rgba(6, 182, 212, 0.35)',
+    border: 'rgba(34, 211, 238, 0.3)',
+  },
+  'OPEN': {
+    gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+    text: '#ffffff',
+    glow: 'rgba(6, 182, 212, 0.35)',
+    border: 'rgba(34, 211, 238, 0.3)',
+  },
+  'CANCELLED': {
+    gradient: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+    text: '#e5e7eb',
+    glow: 'rgba(107, 114, 128, 0.3)',
+    border: 'rgba(156, 163, 175, 0.3)',
+  },
+  'REJECTED': {
+    gradient: 'linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%)',
+    text: '#fca5a5',
+    glow: 'rgba(153, 27, 27, 0.35)',
+    border: 'rgba(252, 165, 165, 0.2)',
+  },
+  'ACTIVE': {
+    gradient: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+    text: '#ffffff',
+    glow: 'rgba(34, 197, 94, 0.4)',
+    border: 'rgba(74, 222, 128, 0.3)',
+  },
   // Order types
-  'MARKET': { bg: '#4c1d95', text: '#c4b5fd' },
-  'LIMIT': { bg: '#1e3a5f', text: '#7dd3fc' },
-  'STOP': { bg: '#713f12', text: '#fcd34d' },
+  'MARKET': {
+    gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+    text: '#ffffff',
+    glow: 'rgba(139, 92, 246, 0.35)',
+    border: 'rgba(167, 139, 250, 0.3)',
+  },
+  'LIMIT': {
+    gradient: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+    text: '#ffffff',
+    glow: 'rgba(14, 165, 233, 0.35)',
+    border: 'rgba(56, 189, 248, 0.3)',
+  },
+  'STOP': {
+    gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+    text: '#ffffff',
+    glow: 'rgba(234, 179, 8, 0.35)',
+    border: 'rgba(250, 204, 21, 0.3)',
+  },
 };
 
 function BadgeRenderer({ value }: ICellRendererParams) {
   const strVal = String(value || '').toUpperCase();
   const colors = BADGE_COLORS[strVal];
-  
+
   if (colors) {
     return (
       <span style={{
-        display: 'inline-block',
-        padding: '2px 8px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1px 8px',
         borderRadius: '4px',
-        fontSize: '11px',
+        fontSize: '10px',
         fontWeight: 600,
-        letterSpacing: '0.5px',
-        backgroundColor: colors.bg,
+        letterSpacing: '0.3px',
+        background: colors.gradient,
         color: colors.text,
         textTransform: 'uppercase',
+        boxShadow: `0 1px 4px ${colors.glow}`,
+        textShadow: '0 1px 1px rgba(0,0,0,0.2)',
       }}>
         {value}
       </span>
     );
   }
-  
+
   return <span>{value}</span>;
 }
 
@@ -696,6 +780,11 @@ export function DataGridWidget({
     return { rowData: paginatedRows, columnDefs };
   }, [data, colorRules, showFlags, showBadges, showSparklines, flashPrices, columnColors, columnColorConfigs, currentPage, pageSize, enablePagination, serverSidePagination]);
   
+  // Generate a key for AG Grid to force re-render when column color config changes
+  const gridKey = useMemo(() => {
+    return JSON.stringify(columnColorConfigs);
+  }, [columnColorConfigs]);
+
   // Use actual row count for client-side pagination
   const displayTotalRows = serverSidePagination ? totalRows : (
     useMemo(() => {
@@ -729,6 +818,7 @@ export function DataGridWidget({
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="ag-theme-alpine-dark" style={{ flex: 1, minHeight: 0 }}>
         <AgGridReact
+          key={gridKey}
           rowData={rowData}
           columnDefs={columnDefs}
           defaultColDef={{

@@ -223,7 +223,6 @@ body {
   font-size: 11px;
   font-weight: 600;
   color: #e8e8ec;
-  text-transform: uppercase;
   letter-spacing: 0.3px;
   white-space: nowrap;
   overflow: hidden;
@@ -235,7 +234,6 @@ body {
   font-weight: 400;
   color: #585868;
   font-family: var(--font-mono);
-  text-transform: lowercase;
 }
 
 .custom-header-sort {
