@@ -119,20 +119,40 @@ export function DashboardCanvas() {
       intervals.forEach(clearInterval);
     };
   }, [activeDashboard?.id, connectionStatus]); // Re-setup intervals when dashboard or connection changes
-  
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  const appMode = useLensStore(state => state.appMode);
+  const isDevMode = appMode === 'dev';
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const widgetType = e.dataTransfer.getData('widget-type');
     if (!widgetType || !activeDashboard) return;
-    
+
     const type = widgetType.startsWith('chart-') ? 'chart' : widgetType as WidgetType['type'];
     const chartType = widgetType.startsWith('chart-') ? widgetType.replace('chart-', '') : undefined;
-    
+
+    // Calculate grid position from drop location
+    let x = 0, y = 0;
+    if (gridRef.current) {
+      const rect = gridRef.current.getBoundingClientRect();
+      const dropX = e.clientX - rect.left;
+      const dropY = e.clientY - rect.top;
+
+      // Grid: 12 columns with 12px gap, rows are 60px with 12px gap
+      const gap = 12;
+      const cellWidth = (rect.width - gap * 11) / 12;
+      const cellHeight = 60;
+
+      x = Math.max(0, Math.min(8, Math.floor(dropX / (cellWidth + gap)))); // Max x=8 for w=4 widget
+      y = Math.max(0, Math.floor(dropY / (cellHeight + gap)));
+    }
+
     addWidget(activeDashboard.id, {
       type,
       title: `New ${type.charAt(0).toUpperCase() + type.slice(1)}`,
       config: chartType ? { chartType } : {},
-      position: { x: 0, y: 0, w: 4, h: 4 },
+      position: { x, y, w: 4, h: 4 },
     });
   }, [activeDashboard, addWidget]);
   
@@ -153,7 +173,7 @@ export function DashboardCanvas() {
   
   if (activeDashboard.widgets.length === 0) {
     return (
-      <div 
+      <div
         className="dashboard-canvas"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -173,19 +193,20 @@ export function DashboardCanvas() {
   }
   
   return (
-    <div 
+    <div
       className="dashboard-canvas"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onClick={() => setSelectedWidget(null)}
     >
-      <div className="dashboard-grid">
+      <div ref={gridRef} className="dashboard-grid">
         {activeDashboard.widgets.map(widget => (
           <WidgetWrapper
             key={widget.id}
             widget={widget}
             isSelected={selectedWidgetId === widget.id}
             onSelect={() => setSelectedWidget(widget.id)}
+            isDevMode={isDevMode}
           />
         ))}
       </div>
@@ -197,19 +218,23 @@ interface WidgetWrapperProps {
   widget: WidgetType;
   isSelected: boolean;
   onSelect: () => void;
+  isDevMode: boolean;
 }
 
-function WidgetWrapper({ widget, isSelected, onSelect }: WidgetWrapperProps) {
+function WidgetWrapper({ widget, isSelected, onSelect, isDevMode }: WidgetWrapperProps) {
   const deleteWidget = useLensStore(state => state.deleteWidget);
   const updateWidget = useLensStore(state => state.updateWidget);
   const activeDashboardId = useLensStore(state => state.workspace.activeDashboardId);
-  const appMode = useLensStore(state => state.appMode);
   const [showConfig, setShowConfig] = useState(false);
   const [pageData, setPageData] = useState<unknown>(null);
   const [totalRows, setTotalRows] = useState<number | undefined>(undefined);
   const [isResizing, setIsResizing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragPos, setDragPos] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [localSize, setLocalSize] = useState({ w: widget.position.w, h: widget.position.h });
   const resizeRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
+  const dragStartRef = useRef<{ mouseX: number; mouseY: number; elemX: number; elemY: number; elemW: number; elemH: number } | null>(null);
+  const widgetRef = useRef<HTMLDivElement>(null);
 
   const isPaused = widget.config?.paused === true;
 
@@ -220,8 +245,6 @@ function WidgetWrapper({ widget, isSelected, onSelect }: WidgetWrapperProps) {
     });
   }, [activeDashboardId, widget.id, widget.config, isPaused, updateWidget]);
 
-  const isDevMode = appMode === 'dev';
-  
   // Get bound query data - extract specific fields to prevent unnecessary re-renders
   const boundQueryId = widget.binding?.queryId;
   
@@ -366,10 +389,100 @@ function WidgetWrapper({ widget, isSelected, onSelect }: WidgetWrapperProps) {
   useEffect(() => {
     setLocalSize({ w: widget.position.w, h: widget.position.h });
   }, [widget.position.w, widget.position.h]);
-  
-  const style: React.CSSProperties = {
-    gridColumn: `span ${localSize.w}`,
-    gridRow: `span ${localSize.h}`,
+
+  // Manual drag handlers - use position:fixed during drag
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    if (!isDevMode || !widgetRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = widgetRef.current.getBoundingClientRect();
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      elemX: rect.left,
+      elemY: rect.top,
+      elemW: rect.width,
+      elemH: rect.height,
+    };
+    setDragPos({ x: rect.left, y: rect.top, w: rect.width, h: rect.height });
+    setIsDragging(true);
+  }, [isDevMode]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragStartRef.current) return;
+      const deltaX = e.clientX - dragStartRef.current.mouseX;
+      const deltaY = e.clientY - dragStartRef.current.mouseY;
+      setDragPos({
+        x: dragStartRef.current.elemX + deltaX,
+        y: dragStartRef.current.elemY + deltaY,
+        w: dragStartRef.current.elemW,
+        h: dragStartRef.current.elemH,
+      });
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (!dragStartRef.current || !activeDashboardId) {
+        setDragPos(null);
+        setIsDragging(false);
+        dragStartRef.current = null;
+        return;
+      }
+
+      const deltaX = e.clientX - dragStartRef.current.mouseX;
+      const deltaY = e.clientY - dragStartRef.current.mouseY;
+
+      // Calculate grid cell size (12 columns, 60px rows, 12px gap)
+      const gap = 12;
+      const gridContainer = document.querySelector('.dashboard-grid');
+      if (gridContainer) {
+        const rect = gridContainer.getBoundingClientRect();
+        const cellWidth = (rect.width - gap * 11) / 12;
+        const cellHeight = 60;
+
+        const deltaGridX = Math.round(deltaX / (cellWidth + gap));
+        const deltaGridY = Math.round(deltaY / (cellHeight + gap));
+
+        if (deltaGridX !== 0 || deltaGridY !== 0) {
+          const newX = Math.max(0, Math.min(12 - widget.position.w, widget.position.x + deltaGridX));
+          const newY = Math.max(0, widget.position.y + deltaGridY);
+          updateWidget(activeDashboardId, widget.id, {
+            position: { ...widget.position, x: newX, y: newY }
+          });
+        }
+      }
+
+      setDragPos(null);
+      setIsDragging(false);
+      dragStartRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, activeDashboardId, widget, updateWidget]);
+
+  // Widget style - use fixed position during drag
+  const style: React.CSSProperties = isDragging && dragPos ? {
+    position: 'fixed',
+    left: dragPos.x,
+    top: dragPos.y,
+    width: dragPos.w,
+    height: dragPos.h,
+    zIndex: 1000,
+    cursor: 'grabbing',
+    boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+  } : {
+    gridColumnStart: widget.position.x + 1,
+    gridColumnEnd: `span ${localSize.w}`,
+    gridRowStart: widget.position.y + 1,
+    gridRowEnd: `span ${localSize.h}`,
   };
   
   // Use page data if available, otherwise use bound query result
@@ -472,7 +585,8 @@ function WidgetWrapper({ widget, isSelected, onSelect }: WidgetWrapperProps) {
   
   return (
     <div
-      className={`widget ${isSelected && isDevMode ? 'selected' : ''} ${isDevMode ? '' : 'live-mode'}`}
+      ref={widgetRef}
+      className={`widget ${isSelected && isDevMode ? 'selected' : ''} ${isDevMode ? '' : 'live-mode'} ${isDragging ? 'dragging' : ''}`}
       style={style}
       onClick={(e) => {
         if (!isDevMode) return;
@@ -480,8 +594,11 @@ function WidgetWrapper({ widget, isSelected, onSelect }: WidgetWrapperProps) {
         onSelect();
       }}
     >
-      {/* Widget header - minimal in live mode */}
-      <div className={`widget-header ${isDevMode ? '' : 'live-mode'}`}>
+      {/* Widget header - minimal in live mode, draggable in dev mode */}
+      <div
+        className={`widget-header ${isDevMode ? '' : 'live-mode'} ${isDragging ? 'dragging' : ''}`}
+        onMouseDown={isDevMode ? handleDragStart : undefined}
+      >
         <div className="widget-title-row">
           <span className="widget-title">{widget.title}</span>
           {gridDimensions && (

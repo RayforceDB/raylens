@@ -731,7 +731,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: box-shadow 0.15s, border-color 0.15s;
+  transition: box-shadow 0.15s, border-color 0.15s, transform 0.15s ease-out;
 }
 
 .widget:hover {
@@ -743,6 +743,15 @@
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
+.widget.dragging {
+  opacity: 0.9;
+  z-index: 100;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  border-color: var(--accent-blue);
+  will-change: transform;
+  cursor: grabbing;
+}
+
 .widget-header {
   display: flex;
   align-items: center;
@@ -751,6 +760,16 @@
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border-subtle);
   cursor: move;
+  user-select: none;
+}
+
+.widget-header.dragging {
+  cursor: grabbing;
+}
+
+.widget.live-mode .widget-header,
+.widget-header.live-mode {
+  cursor: default;
 }
 
 .widget-title-row {
