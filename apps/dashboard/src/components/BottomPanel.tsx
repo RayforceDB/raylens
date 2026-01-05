@@ -169,6 +169,7 @@ function QueryEditorPanel({ isFullscreen = false }: { isFullscreen?: boolean }) 
   
   const [localCode, setLocalCode] = useState('');
   const prevQueryIdRef = useRef(selectedQueryId);
+  const runQueryRef = useRef<() => void>(() => {});
   
   // Sync local code when selection changes
   useEffect(() => {
@@ -198,6 +199,9 @@ function QueryEditorPanel({ isFullscreen = false }: { isFullscreen?: boolean }) 
       setQueryError(selectedQuery.id, (err as Error).message);
     }
   }, [selectedQuery, localCode, updateQuery, setQueryRunning, setQueryResult, setQueryError]);
+  
+  // Keep ref updated with latest runQuery
+  runQueryRef.current = runQuery;
   
   const handleEditorChange = useCallback((value: string | undefined) => {
     setLocalCode(value || '');
@@ -267,6 +271,20 @@ function QueryEditorPanel({ isFullscreen = false }: { isFullscreen?: boolean }) 
                 registerRayfallLanguage(monacoInstance);
                 rayfallRegistered = true;
               }
+            }}
+            onMount={(editor, monaco) => {
+              // Register Ctrl+Enter to run query
+              editor.addAction({
+                id: 'run-query',
+                label: 'Run Query',
+                keybindings: [
+                  monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+                ],
+                run: () => {
+                  // Use ref to always get latest runQuery function
+                  runQueryRef.current();
+                },
+              });
             }}
             options={{
               minimap: { enabled: false },

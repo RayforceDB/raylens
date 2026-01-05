@@ -137,7 +137,10 @@ const createDefaultWorkspace = (): Workspace => {
   const tradeCountId = uuid();
   const quoteCountId = uuid();
   const tradeColumnsId = uuid();
+  const quoteColumnsId = uuid();
   const tradesBySymbolId = uuid();
+  const recentTradesId = uuid();
+  const recentQuotesId = uuid();
   
   return {
     id: uuid(),
@@ -145,6 +148,20 @@ const createDefaultWorkspace = (): Workspace => {
     serverUrl: 'ws://localhost:8765',
     activeDashboardId: dashboardId,
     queries: [
+      // Schema exploration queries - (key table) returns column names
+      {
+        id: tradeColumnsId,
+        name: 'Trade Schema',
+        code: '(key trades)',
+        isRunning: false,
+      },
+      {
+        id: quoteColumnsId,
+        name: 'Quote Schema',
+        code: '(key quotes)',
+        isRunning: false,
+      },
+      // Count queries
       {
         id: tradeCountId,
         name: 'Trade Count',
@@ -157,44 +174,51 @@ const createDefaultWorkspace = (): Workspace => {
         code: '(count quotes)',
         isRunning: false,
       },
-      {
-        id: tradeColumnsId,
-        name: 'Trade Columns',
-        code: '(cols trades)',
-        isRunning: false,
-      },
+      // Aggregation query - run (cols trades) first to see column names!
       {
         id: tradesBySymbolId,
-        name: 'Trades by Symbol',
-        code: '(select {cnt: (count Sym) from: trades by: Sym})',
+        name: 'Trades Grouped',
+        code: ';; First run: (cols trades) to see column names\n;; Then update COLUMN_NAME below:\n(select {\n  cnt: (count COLUMN_NAME)\n  from: trades\n  by: COLUMN_NAME})',
+        isRunning: false,
+      },
+      // Recent data - (take collection -n) for last n items
+      {
+        id: recentTradesId,
+        name: 'Recent Trades',
+        code: '(take trades -10)',
         isRunning: false,
       },
       {
-        id: uuid(),
-        name: 'Recent Trades',
-        code: '(take trades 10)',
+        id: recentQuotesId,
+        name: 'Recent Quotes',
+        code: '(take quotes -10)',
         isRunning: false,
       },
     ],
     dashboards: [
       {
         id: dashboardId,
-        name: 'Trades Dashboard',
+        name: 'Trading Dashboard',
         createdAt: Date.now(),
         updatedAt: Date.now(),
         widgets: [
-          // Grid: Trades by Symbol
+          // Grid: Recent Trades - shows actual table structure
           {
             id: uuid(),
             type: 'grid',
-            title: 'Trades by Symbol',
-            binding: { queryId: tradesBySymbolId, refreshInterval: 10000, autoRun: true },
-            config: {
-              columnColorConfigs: [
-                { column: 'cnt', type: 'preset', preset: 'positive-negative' }
-              ]
-            },
-            position: { x: 0, y: 0, w: 6, h: 6 },
+            title: 'Recent Trades',
+            binding: { queryId: recentTradesId, refreshInterval: 5000, autoRun: true },
+            config: {},
+            position: { x: 0, y: 0, w: 6, h: 4 },
+          },
+          // Grid: Recent Quotes
+          {
+            id: uuid(),
+            type: 'grid',
+            title: 'Recent Quotes',
+            binding: { queryId: recentQuotesId, refreshInterval: 5000, autoRun: true },
+            config: {},
+            position: { x: 6, y: 0, w: 6, h: 4 },
           },
           // Text: Total Trade Count
           {
@@ -203,25 +227,34 @@ const createDefaultWorkspace = (): Workspace => {
             title: 'Total Trades',
             binding: { queryId: tradeCountId, refreshInterval: 5000, autoRun: true },
             config: { fontSize: 48, prefix: '', suffix: ' trades' },
-            position: { x: 6, y: 0, w: 3, h: 3 },
+            position: { x: 0, y: 4, w: 3, h: 2 },
           },
-          // Chart: Pie chart of trades by symbol
+          // Text: Total Quote Count  
           {
             id: uuid(),
-            type: 'chart',
-            title: 'Symbol Distribution',
-            binding: { queryId: tradesBySymbolId, refreshInterval: 10000, autoRun: true },
-            config: { chartType: 'pie' },
-            position: { x: 9, y: 0, w: 3, h: 3 },
+            type: 'text',
+            title: 'Total Quotes',
+            binding: { queryId: quoteCountId, refreshInterval: 5000, autoRun: true },
+            config: { fontSize: 48, prefix: '', suffix: ' quotes' },
+            position: { x: 3, y: 4, w: 3, h: 2 },
           },
-          // Chart: Bar chart of trades by symbol
+          // Grid: Trade Schema - shows available columns
           {
             id: uuid(),
-            type: 'chart',
-            title: 'Trades per Symbol',
-            binding: { queryId: tradesBySymbolId, refreshInterval: 10000, autoRun: true },
-            config: { chartType: 'bar' },
-            position: { x: 6, y: 3, w: 6, h: 3 },
+            type: 'grid',
+            title: 'Trade Columns',
+            binding: { queryId: tradeColumnsId, refreshInterval: 0, autoRun: true },
+            config: {},
+            position: { x: 6, y: 4, w: 3, h: 2 },
+          },
+          // Grid: Quote Schema - shows available columns
+          {
+            id: uuid(),
+            type: 'grid',
+            title: 'Quote Columns',
+            binding: { queryId: quoteColumnsId, refreshInterval: 0, autoRun: true },
+            config: {},
+            position: { x: 9, y: 4, w: 3, h: 2 },
           },
         ],
       },

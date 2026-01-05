@@ -36,6 +36,123 @@ const Types = {
   ERR: 127,
 } as const;
 
+// Temporal type constants
+const EPOCH = 2000;
+const NULL_I32 = -2147483648; // 0x80000000
+const NULL_I64 = BigInt('-9223372036854775808'); // 0x8000000000000000
+const NSECS_IN_DAY = BigInt(86400000000000); // 24 * 60 * 60 * 1e9
+
+// Cumulative days before each month (index 0 = before Jan, 12 = before Dec end)
+// [non-leap year, leap year]
+const MONTHDAYS_FWD = [
+  [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365],  // Non-leap
+  [0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366],  // Leap
+];
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+}
+
+// Calculate total days from year 0 to end of given year (Rayforce algorithm)
+function yearsByDays(yy: number): number {
+  return yy * 365 + Math.floor(yy / 4) - Math.floor(yy / 100) + Math.floor(yy / 400);
+}
+
+/**
+ * Convert DATE (i32 days since epoch 2000.01.01) to formatted string
+ * Format: YYYY.MM.DD
+ */
+function formatDate(offset: number): string {
+  if (offset === NULL_I32) return 'null';
+  
+  // Add days since year 0 to epoch-1 (1999)
+  const totalDays = offset + yearsByDays(EPOCH - 1);
+  
+  // Estimate year
+  let years = Math.round(totalDays / 365.2425);
+  
+  // Adjust if overshot
+  if (yearsByDays(years) > totalDays) {
+    years -= 1;
+  }
+  
+  // Calculate day of year
+  const days = totalDays - yearsByDays(years);
+  const yy = years + 1;
+  const leap = isLeapYear(yy) ? 1 : 0;
+  
+  // Find month by checking cumulative days
+  let mid = 0;
+  for (mid = 11; mid >= 0; mid--) {
+    if (MONTHDAYS_FWD[leap][mid] <= days) {
+      break;
+    }
+  }
+  if (mid < 0) mid = 0;
+  
+  const mm = mid + 1;
+  const dd = days - MONTHDAYS_FWD[leap][mid] + 1;
+  
+  return `${yy.toString().padStart(4, '0')}.${mm.toString().padStart(2, '0')}.${dd.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Convert TIME (i32 milliseconds since midnight) to formatted string
+ * Format: HH:MM:SS.mmm
+ */
+function formatTime(offset: number): string {
+  if (offset === NULL_I32) return 'null';
+  
+  const sign = offset < 0 ? '-' : '';
+  let ms = Math.abs(offset);
+  
+  const hours = Math.floor(ms / 3600000);
+  ms %= 3600000;
+  const mins = Math.floor(ms / 60000);
+  ms %= 60000;
+  const secs = Math.floor(ms / 1000);
+  ms %= 1000;
+  
+  return `${sign}${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
+}
+
+/**
+ * Convert TIMESTAMP (i64 nanoseconds since epoch) to formatted string
+ * Format: YYYY.MM.DDDHH:MM:SS.nnnnnnnnn
+ */
+function formatTimestamp(nanos: bigint): string {
+  if (nanos === NULL_I64) return 'null';
+  
+  // Split into days and time-of-day
+  let days = nanos / NSECS_IN_DAY;
+  let timeNanos = nanos % NSECS_IN_DAY;
+  
+  if (timeNanos < 0n) {
+    days -= 1n;
+    timeNanos += NSECS_IN_DAY;
+  }
+  
+  // Format date part (reuse formatDate logic with days since epoch)
+  const datePart = formatDate(Number(days));
+  
+  // Format time part from nanoseconds
+  const NANOS_PER_HOUR = BigInt(3600000000000);
+  const NANOS_PER_MIN = BigInt(60000000000);
+  const NANOS_PER_SEC = BigInt(1000000000);
+  
+  let ns = timeNanos;
+  const hours = ns / NANOS_PER_HOUR;
+  ns %= NANOS_PER_HOUR;
+  const mins = ns / NANOS_PER_MIN;
+  ns %= NANOS_PER_MIN;
+  const secs = ns / NANOS_PER_SEC;
+  const nanoRemainder = ns % NANOS_PER_SEC;
+  
+  const timePart = `${Number(hours).toString().padStart(2, '0')}:${Number(mins).toString().padStart(2, '0')}:${Number(secs).toString().padStart(2, '0')}.${Number(nanoRemainder).toString().padStart(9, '0')}`;
+  
+  return `${datePart}D${timePart}`;
+}
+
 // Type definitions for the SDK
 interface RayforceSDK {
   eval(code: string, source?: string): RayObject;
@@ -92,6 +209,15 @@ interface Table extends RayObject {
 // Header: prefix(4) version(1) flags(1) endian(1) msgtype(1) size(8) = 16 bytes
 const IPC_PREFIX = 0xcefadefa;
 const IPC_HEADER_SIZE = 16;
+
+// RAYFORCE_VERSION = (RAYFORCE_MAJOR_VERSION >> 3 | RAYFORCE_MINOR_VERSION)
+// For version 0.1: (0 >> 3) | 1 = 1
+const RAYFORCE_VERSION = 0x01;
+
+// Message types (from core/ipc.h)
+// MSG_TYPE_ASYN = 0 (async, no response expected)
+const MSG_TYPE_SYNC = 1;
+// MSG_TYPE_RESP = 2 (response)
 
 export interface RayforceResult {
   type: 'table' | 'scalar' | 'vector' | 'error' | 'null';
@@ -159,9 +285,13 @@ export class RayforceClient {
   private ws: WebSocket | null = null;
   private connected = false;
   private eventListeners: Map<string, Set<EventCallback>> = new Map();
-  private pendingRequests: Map<number, { resolve: (value: RayforceResult) => void; reject: (error: Error) => void }> = new Map();
+  private pendingRequests: Map<number, { resolve: (value: RayforceResult) => void; reject: (error: Error) => void; query: string }> = new Map();
   private requestId = 0;
   private sdk: RayforceSDK | null = null;
+  
+  // Request queue for serialization (IPC has no request IDs, so we must serialize)
+  private requestQueue: Array<{ code: string; timeout: number; resolve: (value: RayforceResult) => void; reject: (error: Error) => void }> = [];
+  private isProcessingQueue = false;
 
   constructor() {
     // SDK loaded on demand
@@ -250,11 +380,9 @@ export class RayforceClient {
         logInfo('Rayforce', 'WebSocket connected, sending Rayforce IPC handshake...');
         
         // Rayforce IPC handshake: [version][0x00] (2 bytes)
-        // RAYFORCE_VERSION is typically 0x03
-        const RAYFORCE_VERSION = 0x03;
         const handshake = new Uint8Array([RAYFORCE_VERSION, 0x00]);
         
-        logDebug('Rayforce', `Sending IPC handshake: version=${RAYFORCE_VERSION} (${handshake.length} bytes)`);
+        logDebug('Rayforce', `Sending IPC handshake: version=0x${RAYFORCE_VERSION.toString(16)} (${handshake.length} bytes)`);
         this.ws!.send(handshake.buffer);
       };
 
@@ -386,7 +514,7 @@ export class RayforceClient {
   }
 
   /**
-   * Execute query on remote server
+   * Execute query on remote server (queued for serialization)
    */
   async query(code: string, timeout = 30000): Promise<RayforceResult> {
     if (!this.isConnected()) {
@@ -395,6 +523,40 @@ export class RayforceClient {
       throw new Error(err);
     }
 
+    // Queue the request for serialized execution
+    return new Promise((resolve, reject) => {
+      this.requestQueue.push({ code, timeout, resolve, reject });
+      this.processQueue();
+    });
+  }
+
+  /**
+   * Process queued requests one at a time
+   */
+  private async processQueue(): Promise<void> {
+    if (this.isProcessingQueue || this.requestQueue.length === 0) {
+      return;
+    }
+    
+    this.isProcessingQueue = true;
+    
+    while (this.requestQueue.length > 0 && this.isConnected()) {
+      const request = this.requestQueue.shift()!;
+      try {
+        const result = await this.executeQueryInternal(request.code, request.timeout);
+        request.resolve(result);
+      } catch (error) {
+        request.reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+    
+    this.isProcessingQueue = false;
+  }
+
+  /**
+   * Internal query execution (one at a time)
+   */
+  private executeQueryInternal(code: string, timeout: number): Promise<RayforceResult> {
     const startTime = performance.now();
     logDebug('Query', `[REMOTE] ${code}`);
 
@@ -414,20 +576,69 @@ export class RayforceClient {
         resolve(result);
       };
       
-      this.pendingRequests.set(id, { resolve: handleResult, reject });
+      this.pendingRequests.set(id, { resolve: handleResult, reject, query: code });
 
-      // Send as text message - server's _process_text_message uses eval_str
-      this.ws!.send(code);
+      // Send query with IPC message format
+      const message = this.createIPCMessage(code, MSG_TYPE_SYNC);
+      logDebug('Rayforce', `Sending IPC message #${id}: ${message.byteLength} bytes (query: ${code.substring(0, 50)}${code.length > 50 ? '...' : ''})`);
+      this.ws!.send(message);
 
       // Timeout
       setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id);
-          logError('Query', `[REMOTE] Timeout after ${timeout}ms`);
+          logError('Query', `[REMOTE] Timeout after ${timeout}ms: ${code.substring(0, 50)}`);
           reject(new Error(`Query timeout after ${timeout}ms`));
         }
       }, timeout);
     });
+  }
+
+  /**
+   * Create IPC message with header and serialized string payload
+   * 
+   * IPC Header (16 bytes):
+   *   prefix(4) version(1) flags(1) endian(1) msgtype(1) size(8)
+   * 
+   * String serialization:
+   *   type(1) = 12 (C8)
+   *   attrs(1) = 0
+   *   length(8)
+   *   data(n)
+   */
+  private createIPCMessage(code: string, msgType: number): ArrayBuffer {
+    // Encode string as UTF-8
+    const encoder = new TextEncoder();
+    const codeBytes = encoder.encode(code);
+    
+    // Serialized string format: type(1) + attrs(1) + length(8) + data
+    const payloadSize = 1 + 1 + 8 + codeBytes.length;
+    
+    // Total message: header(16) + payload
+    const totalSize = IPC_HEADER_SIZE + payloadSize;
+    const buffer = new ArrayBuffer(totalSize);
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+    
+    // Write IPC header (little-endian)
+    view.setUint32(0, IPC_PREFIX, true);        // prefix
+    view.setUint8(4, RAYFORCE_VERSION);          // version
+    view.setUint8(5, 0);                         // flags
+    view.setUint8(6, 0);                         // endian (0 = little)
+    view.setUint8(7, msgType);                   // msgtype
+    view.setBigInt64(8, BigInt(payloadSize), true); // size
+    
+    // Write serialized string payload
+    let offset = IPC_HEADER_SIZE;
+    view.setInt8(offset, Types.C8);              // type = 12 (C8 string)
+    offset += 1;
+    view.setUint8(offset, 0);                    // attrs
+    offset += 1;
+    view.setBigInt64(offset, BigInt(codeBytes.length), true); // length
+    offset += 8;
+    bytes.set(codeBytes, offset);                // data
+    
+    return buffer;
   }
 
   /**
@@ -450,21 +661,40 @@ export class RayforceClient {
       return;
     }
 
-    // Binary data - parse IPC response
+    // Binary data - check if it's JSON error or IPC response
     const buffer = new Uint8Array(data);
     logDebug('Rayforce', `Received binary: ${buffer.length} bytes`);
+    
+    // Check if the response is JSON (starts with '{')
+    if (buffer.length > 0 && buffer[0] === 0x7b) { // '{' = 0x7b
+      try {
+        const decoder = new TextDecoder();
+        const text = decoder.decode(buffer);
+        logDebug('Rayforce', `Received JSON response: ${text.substring(0, 200)}`);
+        const json = JSON.parse(text);
+        if (json.error) {
+          logError('Rayforce', `Server error: ${json.error}`);
+          this.resolvePending({ type: 'error', data: json.error });
+          return;
+        }
+        // Unknown JSON response
+        logWarn('Rayforce', `Unexpected JSON response: ${text.substring(0, 100)}`);
+        this.resolvePending({ type: 'error', data: `Unexpected response: ${text.substring(0, 100)}` });
+        return;
+      } catch (e) {
+        logWarn('Rayforce', `Failed to parse potential JSON: ${e}`);
+      }
+    }
 
     // Parse IPC header: prefix(4) version(1) flags(1) endian(1) msgtype(1) size(8)
     const view = new DataView(data);
     const prefix = view.getUint32(0, true); // little-endian
     
     if (prefix !== IPC_PREFIX) {
-      // Show first 32 bytes for debugging
-      const hexBytes = Array.from(buffer.slice(0, 32))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join(' ');
-      logError('Rayforce', `Invalid IPC prefix: 0x${prefix.toString(16)}. Expected: 0x${IPC_PREFIX.toString(16)}. First 32 bytes: ${hexBytes}`);
-      this.resolvePending({ type: 'error', data: `Invalid IPC response (prefix: 0x${prefix.toString(16)})` });
+      // Try to decode as text for better error message
+      const textPreview = new TextDecoder().decode(buffer.slice(0, Math.min(64, buffer.length)));
+      logError('Rayforce', `Invalid IPC prefix: 0x${prefix.toString(16)}. Expected: 0x${IPC_PREFIX.toString(16)}. Preview: "${textPreview}"`);
+      this.resolvePending({ type: 'error', data: textPreview || `Invalid IPC response` });
       return;
     }
 
@@ -569,12 +799,15 @@ export class RayforceClient {
       case Types.I16:
         return { type: 'scalar', data: view.getInt16(offset, true) };
       case Types.I32:
-      case Types.DATE:
-      case Types.TIME:
         return { type: 'scalar', data: view.getInt32(offset, true) };
+      case Types.DATE:
+        return { type: 'scalar', data: formatDate(view.getInt32(offset, true)) };
+      case Types.TIME:
+        return { type: 'scalar', data: formatTime(view.getInt32(offset, true)) };
       case Types.I64:
-      case Types.TIMESTAMP:
         return { type: 'scalar', data: Number(view.getBigInt64(offset, true)) };
+      case Types.TIMESTAMP:
+        return { type: 'scalar', data: formatTimestamp(view.getBigInt64(offset, true)) };
       case Types.F64:
         return { type: 'scalar', data: view.getFloat64(offset, true) };
       case Types.SYMBOL: {
@@ -619,14 +852,23 @@ export class RayforceClient {
           offset += 2;
           break;
         case Types.I32:
-        case Types.DATE:
-        case Types.TIME:
           data.push(view.getInt32(offset, true));
           offset += 4;
           break;
+        case Types.DATE:
+          data.push(formatDate(view.getInt32(offset, true)));
+          offset += 4;
+          break;
+        case Types.TIME:
+          data.push(formatTime(view.getInt32(offset, true)));
+          offset += 4;
+          break;
         case Types.I64:
-        case Types.TIMESTAMP:
           data.push(Number(view.getBigInt64(offset, true)));
+          offset += 8;
+          break;
+        case Types.TIMESTAMP:
+          data.push(formatTimestamp(view.getBigInt64(offset, true)));
           offset += 8;
           break;
         case Types.F64:
@@ -847,11 +1089,11 @@ export class RayforceClient {
       case Types.U8: return view.getUint8(offset);
       case Types.C8: return String.fromCharCode(view.getUint8(offset));
       case Types.I16: return view.getInt16(offset, true);
-      case Types.I32:
-      case Types.DATE:
-      case Types.TIME: return view.getInt32(offset, true);
-      case Types.I64:
-      case Types.TIMESTAMP: return Number(view.getBigInt64(offset, true));
+      case Types.I32: return view.getInt32(offset, true);
+      case Types.DATE: return formatDate(view.getInt32(offset, true));
+      case Types.TIME: return formatTime(view.getInt32(offset, true));
+      case Types.I64: return Number(view.getBigInt64(offset, true));
+      case Types.TIMESTAMP: return formatTimestamp(view.getBigInt64(offset, true));
       case Types.F64: return view.getFloat64(offset, true);
       default: return null;
     }
@@ -1039,15 +1281,19 @@ export class RayforceClient {
   }
 
   /**
-   * Resolve pending request
+   * Resolve pending request (FIFO - first request gets first response)
    */
   private resolvePending(result: RayforceResult): void {
-    // Resolve the most recent pending request
+    // Resolve the OLDEST pending request (FIFO order)
+    // Since IPC protocol has no request IDs, we assume responses come back in order
     const entries = Array.from(this.pendingRequests.entries());
     if (entries.length > 0) {
-      const [id, { resolve }] = entries[entries.length - 1];
+      const [id, { resolve, query }] = entries[0]; // First entry (oldest request)
+      logDebug('Rayforce', `Resolving request #${id} (${query.substring(0, 30)}...), result type: ${result.type}, ${entries.length - 1} still pending`);
       this.pendingRequests.delete(id);
       resolve(result);
+    } else {
+      logWarn('Rayforce', `Received response but no pending requests. Result type: ${result.type}`);
     }
     
     // Also emit result event
