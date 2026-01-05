@@ -1,0 +1,96 @@
+{
+  "id": "demo-trading-001",
+  "name": "Trading Analytics",
+  "serverUrl": "ws://localhost:8765",
+  "activeDashboardId": "dash-trading-main",
+  "queries": [
+    {
+      "id": "q-trades-recent",
+      "name": "Recent Trades",
+      "code": "10#trades",
+      "isRunning": false
+    },
+    {
+      "id": "q-trade-count",
+      "name": "Trade Count",
+      "code": "count trades",
+      "isRunning": false
+    },
+    {
+      "id": "q-quotes-recent",
+      "name": "Recent Quotes",
+      "code": "5#quotes",
+      "isRunning": false
+    },
+    {
+      "id": "q-quote-count",
+      "name": "Quote Count", 
+      "code": "count quotes",
+      "isRunning": false
+    },
+    {
+      "id": "q-simple-calc",
+      "name": "Simple Calculation",
+      "code": "(+ 100 200)",
+      "isRunning": false
+    }
+  ],
+  "dashboards": [
+    {
+      "id": "dash-trading-main",
+      "name": "Trading Overview",
+      "createdAt": 1704067200000,
+      "updatedAt": 1704067200000,
+      "widgets": [
+        {
+          "id": "w-trades-grid",
+          "type": "grid",
+          "title": "Recent Trades",
+          "binding": {
+            "queryId": "q-trades-recent",
+            "refreshInterval": 5000,
+            "autoRun": true
+          },
+          "config": {},
+          "position": { "x": 0, "y": 0, "w": 8, "h": 5 }
+        },
+        {
+          "id": "w-trade-count",
+          "type": "text",
+          "title": "Total Trades",
+          "binding": {
+            "queryId": "q-trade-count",
+            "refreshInterval": 10000,
+            "autoRun": true
+          },
+          "config": { "fontSize": 56, "color": "var(--accent-blue)" },
+          "position": { "x": 8, "y": 0, "w": 4, "h": 2 }
+        },
+        {
+          "id": "w-quote-count",
+          "type": "text",
+          "title": "Total Quotes",
+          "binding": {
+            "queryId": "q-quote-count",
+            "refreshInterval": 10000,
+            "autoRun": true
+          },
+          "config": { "fontSize": 56, "color": "var(--accent-green)" },
+          "position": { "x": 8, "y": 2, "w": 4, "h": 2 }
+        },
+        {
+          "id": "w-quotes-grid",
+          "type": "grid",
+          "title": "Recent Quotes",
+          "binding": {
+            "queryId": "q-quotes-recent",
+            "refreshInterval": 5000,
+            "autoRun": true
+          },
+          "config": {},
+          "position": { "x": 0, "y": 5, "w": 12, "h": 4 }
+        }
+      ]
+    }
+  ]
+}

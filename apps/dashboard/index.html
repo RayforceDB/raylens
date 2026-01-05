@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RayLens - Reactive Analytics Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Fallback styles in case CSS fails to load -->
+  <style>
+    html, body, #root { 
+      height: 100%; 
+      width: 100%; 
+      margin: 0; 
+      background: #0a0a0f; 
+      color: #e8e8ec;
+    }
+    .app-error {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: system-ui, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    .app-error h1 { color: #ef4444; margin-bottom: 16px; }
+    .app-error pre { 
+      background: #1a1a24; 
+      padding: 16px; 
+      border-radius: 8px; 
+      max-width: 600px;
+      overflow: auto;
+      text-align: left;
+      font-size: 12px;
+    }
+  </style>
+  
+  <!-- Rayforce SDK UMD bundle -->
+  <script src="/rayforce.umd.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <!-- Load WASM module via external script to bypass Vite analysis -->
+  <script type="module" src="/wasm-loader.js"></script>
+  
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "paths": {
+      "@lens/core": ["./packages/core/src"],
+      "@lens/runtime": ["./packages/runtime/src"],
+      "@lens/transport": ["./packages/transport/src"],
+      "@lens/ui": ["./packages/ui/src"]
+    }
+  },
+  "include": ["packages/*/src/**/*", "apps/*/src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

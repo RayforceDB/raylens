@@ -1,0 +1,18 @@
+;; RayLens - Orders Table Setup
+;; Run this script in your Rayforce server to create sample order data
+;; Usage: In Rayforce REPL connected to localhost:8765, copy-paste this
+
+;; Create orders table schema
+(def orders (table {
+  orderId: (til 100)                                    ;; Order IDs 0-99
+  time: (+ (now) (* (til 100) 60000000000))            ;; Timestamps
+  sym: (take 100 (cycle ['AAPL 'MSFT 'GOOG 'AMZN 'META 'TSLA 'NVDA 'AMD]))  ;; Symbols
+  side: (take 100 (cycle ['B 'S 'B 'S 'B]))            ;; Buy/Sell
+  qty: (+ 100 (mod (til 100) 900))                     ;; Quantities 100-999
+  price: (+ 100.0 (* 10.0 (mod (til 100) 50)))         ;; Prices
+  status: (take 100 (cycle ['NEW 'NEW 'FILLED 'PARTIAL 'NEW]))  ;; Status
+}))
+
+;; Verify
+(count orders)
+orders
