@@ -869,10 +869,6 @@
   flex-direction: column;
   padding: 12px;
   overflow: auto;
-  color: var(--accent-red);
-  font-size: 12px;
-  padding: 16px;
-  text-align: center;
   gap: 8px;
   overflow: auto;
 }
@@ -897,8 +893,8 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 6px;
   padding: 12px;
 }
@@ -906,10 +902,11 @@
 .widget-error .error-message {
   font-family: var(--font-mono);
   font-size: 11px;
-  line-height: 1.5;
+  line-height: 1.6;
   white-space: pre;
-  color: var(--accent-red);
+  color: var(--text-secondary);
   margin: 0;
+  text-align: left;
 }
 
 .widget-error .error-location {
