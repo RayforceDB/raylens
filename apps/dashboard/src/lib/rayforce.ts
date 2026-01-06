@@ -179,6 +179,22 @@ interface EmscriptenModule {
   ccall: (name: string, returnType: string, argTypes: string[], args: unknown[]) => unknown;
 }
 
+/** Structured error information from Rayforce */
+interface ErrorInfo {
+  code: string;
+  message?: string;
+  expected?: string;
+  got?: string;
+  need?: number;
+  have?: number;
+  index?: number;
+  bound?: number;
+  name?: string;
+  type?: string;
+  limit?: number;
+  raw?: string;
+}
+
 interface RayObject {
   ptr: number;
   type: number;
@@ -190,6 +206,11 @@ interface RayObject {
   toJS(): unknown;
   toString(): string;
   drop(): void;
+}
+
+interface RayError extends RayObject {
+  info: ErrorInfo;
+  message: string;
 }
 
 interface Vector extends RayObject {
@@ -747,26 +768,40 @@ export class RayforceClient {
       throw new Error('SDK not loaded');
     }
 
-    logInfo('Rayforce', `Loading CSV into table '${name}' (${content.length} bytes)`);
+    logInfo('Rayforce', `Loading CSV into table '${name}' (${content.length} bytes, ${(content.length / (1024 * 1024)).toFixed(1)} MB)`);
 
     // 1. Parse CSV into Table object
     // Note: read_csv returns a Table object associated with the WASM heap
     const table = this.sdk.read_csv(content);
+    
+    logDebug('Rayforce', `read_csv returned: type=${table.type}, isNull=${table.isNull}, isError=${table.isError}, ptr=${table.ptr}`);
 
     if (table.isError) {
-      const err = table.toString();
+      // Use structured error info for clean display
+      const errObj = table as unknown as RayError;
+      const errMsg = errObj.message || table.toString();
+      logError('Rayforce', `CSV parse error: ${errMsg}`);
       table.drop();
-      throw new Error(`CSV parse error: ${err}`);
+      throw new Error(errMsg);
     }
+    
+    if (table.isNull) {
+      logError('Rayforce', `read_csv returned null`);
+      throw new Error('CSV parse returned null');
+    }
+
+    // Get table info before setting
+    const rowCount = (table as Table).rowCount;
+    const columns = (table as Table).columnNames();
+    logInfo('Rayforce', `Parsed table: ${rowCount} rows, ${columns.length} columns (${columns.join(', ')})`);
 
     // 2. Register table as a variable
     // This allows SQL/queries to reference it by name
     this.sdk.set(name, table);
+    logDebug('Rayforce', `Called set('${name}', table)`);
 
     // 3. Drop our reference (the variable 'name' now holds a reference)
-    // Actually, set() might copy or increment ref count.
-    // Usually SDK.set takes ownership or we should drop our handle if we don't need it.
-    // Based on typical Rayforce pattern, we should drop the local handle.
+    // binary_set clones the value, so dropping our reference is safe
     table.drop();
 
     logInfo('Rayforce', `CSV loaded successfully as '${name}'`);
@@ -1299,7 +1334,10 @@ export class RayforceClient {
     }
 
     if (obj.isError) {
-      return { type: 'error', data: obj.toString() };
+      // Use structured error info for clean display
+      const errObj = obj as unknown as RayError;
+      const errMsg = errObj.message || obj.toString();
+      return { type: 'error', data: errMsg };
     }
 
     const type = Math.abs(obj.type);
@@ -1309,10 +1347,43 @@ export class RayforceClient {
       const table = obj as Table;
       const columns = table.columnNames();
       const rowCount = table.rowCount;
+      
+      logDebug('Rayforce', `wrapRayObject TABLE: columns=${columns.length}, rowCount=${rowCount}`);
+      
+      // For display, only convert first N rows (large tables would be too slow)
+      const MAX_DISPLAY_ROWS = 1000;
+      let rows: Record<string, unknown>[] = [];
+      
+      if (rowCount <= MAX_DISPLAY_ROWS) {
+        // Small table - convert all rows
+        try {
+          const startTime = performance.now();
+          rows = table.toRows();
+          logDebug('Rayforce', `toRows() returned ${rows.length} rows in ${(performance.now() - startTime).toFixed(1)}ms`);
+        } catch (err) {
+          logError('Rayforce', `toRows() failed: ${err}`);
+        }
+      } else {
+        // Large table - only get first N rows for display
+        logDebug('Rayforce', `Large table (${rowCount} rows), showing first ${MAX_DISPLAY_ROWS} for display`);
+        try {
+          const startTime = performance.now();
+          for (let i = 0; i < MAX_DISPLAY_ROWS && i < rowCount; i++) {
+            const rowObj = table.row(i);
+            if (rowObj && !rowObj.isNull) {
+              rows.push(rowObj.toJS() as Record<string, unknown>);
+            }
+          }
+          logDebug('Rayforce', `Extracted ${rows.length} display rows in ${(performance.now() - startTime).toFixed(1)}ms`);
+        } catch (err) {
+          logError('Rayforce', `Row extraction failed: ${err}`);
+        }
+      }
 
       return {
         type: 'table',
         rayObject: obj,
+        data: rows,
         columns,
         rowCount,
         // Zero-copy column access
@@ -1321,7 +1392,7 @@ export class RayforceClient {
           if (!col) return null;
           return col.typedArray || null;
         },
-        // Lazy JS conversion
+        // Full conversion - use with caution for large tables
         toJS: () => table.toRows(),
       };
     }

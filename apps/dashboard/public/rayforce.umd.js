@@ -208,7 +208,25 @@
 
   class RayError extends RayObject {
     get isError() { return true; }
-    get message() { return this.toString(); }
+    
+    // Get error message directly from WASM (no allocation, always works)
+    get message() {
+      return this._sdk._getErrorMessage(this._ptr) || 'Unknown error';
+    }
+    
+    // Get structured error info as a plain JS object (may fail if OOM)
+    get info() {
+      try {
+        const infoPtr = this._sdk._getErrorInfo(this._ptr);
+        if (infoPtr === 0) return { code: 'unknown', message: this.message };
+        const infoObj = this._sdk._wrapPtr(infoPtr);
+        if (!infoObj || infoObj.isNull) return { code: 'unknown', message: this.message };
+        return infoObj.toJS();
+      } catch (e) {
+        return { code: 'unknown', message: this.message };
+      }
+    }
+    
     toJS() { throw new Error(this.message); }
   }
 
@@ -402,13 +420,33 @@
       const names = this.columnNames();
       const count = this.rowCount;
       const rows = [];
+      
+      // Cache column references to avoid repeated lookups
+      const cols = names.map(name => this.col(name));
+      
       for (let i = 0; i < count; i++) {
         const row = {};
-        for (const name of names) {
-          row[name] = this.col(name).at(i);
-          if (typeof row[name] === 'bigint') {
-            const n = Number(row[name]);
-            row[name] = Number.isSafeInteger(n) ? n : row[name];
+        for (let c = 0; c < names.length; c++) {
+          const col = cols[c];
+          if (!col || col.isNull) {
+            row[names[c]] = null;
+            continue;
+          }
+          
+          try {
+            let val = col.at(i);
+            // If at() returns a RayObject (e.g. from List), convert to JS
+            if (val instanceof RayObject) {
+              val = val.toJS();
+            }
+            // Handle BigInt values
+            if (typeof val === 'bigint') {
+              const n = Number(val);
+              val = Number.isSafeInteger(n) ? n : val;
+            }
+            row[names[c]] = val;
+          } catch (e) {
+            row[names[c]] = null;
           }
         }
         rows.push(row);
@@ -578,6 +616,8 @@
       this._isObjVector = w.cwrap('is_obj_vector', 'number', ['number']);
       this._isObjNull = w.cwrap('is_obj_null', 'number', ['number']);
       this._isObjError = w.cwrap('is_obj_error', 'number', ['number']);
+      this._getErrorInfo = w.cwrap('get_error_info', 'number', ['number']);
+      this._getErrorMessage = w.cwrap('get_error_message', 'string', ['number']);
       this._getObjRc = w.cwrap('get_obj_rc', 'number', ['number']);
 
       this._getDataPtr = w.cwrap('get_data_ptr', 'number', ['number']);
@@ -843,9 +883,13 @@
     }
 
     set(name, value) {
+      // Create symbol object (binary_set expects -TYPE_SYMBOL object pointer)
       const sym = this.symbol(name);
       const val = value instanceof RayObject ? value : this._toRayObject(value);
+      // binary_set internally clones the value, so we just pass the pointer
       this._globalSet(sym._ptr, val._ptr);
+      // Drop the symbol wrapper after use
+      sym.drop();
     }
 
     get(name) { return this.eval(name); }
@@ -863,7 +907,8 @@
       try {
         this._wasm.stringToUTF8(content, stringOnHeap, lengthBytes);
         // Pass pointer and length (excluding null terminator)
-        return new Table(this, this._readCSV(stringOnHeap, lengthBytes - 1));
+        // Use _wrapPtr to properly detect errors vs tables
+        return this._wrapPtr(this._readCSV(stringOnHeap, lengthBytes - 1));
       } finally {
         this._wasm._free(stringOnHeap);
       }
