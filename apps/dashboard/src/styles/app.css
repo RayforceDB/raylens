@@ -269,6 +269,14 @@
   height: 28px;
 }
 
+.header-logo .brand-text {
+  font-family: var(--font-brand);
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  color: #38bdf8;
+}
+
 .header-divider {
   width: 1px;
   height: 24px;

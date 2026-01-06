@@ -55,7 +55,7 @@ export function Header({ onConnect }: HeaderProps) {
               <line x1="52" y1="32" x2="60" y2="32"/>
             </g>
           </svg>
-          <span>RayLens</span>
+          <span className="brand-text">RAYLENS</span>
         </div>
         
         <div className="header-divider" />
