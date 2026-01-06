@@ -47,7 +47,7 @@ export function Login() {
               <line x1="52" y1="32" x2="60" y2="32"/>
             </g>
           </svg>
-          <h1>RayLens</h1>
+          <h1 className="brand-text">RAYLENS</h1>
           <p className="login-subtitle">Reactive Analytics Dashboard</p>
         </div>
 

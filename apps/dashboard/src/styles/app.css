@@ -62,6 +62,14 @@
   letter-spacing: -0.5px;
 }
 
+.login-header h1.brand-text {
+  font-family: var(--font-brand);
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: 4px;
+  color: #38bdf8;
+}
+
 .login-subtitle {
   font-size: 14px;
   color: var(--text-muted);
