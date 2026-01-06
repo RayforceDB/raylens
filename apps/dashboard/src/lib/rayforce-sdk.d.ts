@@ -104,11 +104,11 @@ declare module '/rayforce.sdk.js' {
 
   export interface RayforceSDK {
     readonly version: string;
-    
+
     // Evaluation
     eval(code: string, sourceName?: string): RayObject;
     format(obj: RayObject | number): string;
-    
+
     // Constructors
     b8(value: boolean): RayObject;
     u8(value: number): RayObject;
@@ -126,12 +126,13 @@ declare module '/rayforce.sdk.js' {
     list(items?: unknown[]): List;
     dict(obj: object): Dict;
     table(columns: Record<string, unknown[]>): Table;
-    
+
     // Utilities
     set(name: string, value: unknown): void;
     get(name: string): RayObject;
     typeName(typeCode: number): string;
-    
+    read_csv(content: string): Table;
+
     // Internal
     _deserialize(bufferPtr: number): number;
     _wrapPtr(ptr: number): RayObject;

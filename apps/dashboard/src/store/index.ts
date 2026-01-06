@@ -68,34 +68,34 @@ interface LensState {
   // Auth
   user: User | null;
   isAuthenticated: boolean;
-  
+
   // Connection
   connectionStatus: ConnectionStatus;
   serverUrl: string;
-  
+
   // App Mode
   appMode: AppMode;
-  
+
   // Workspace
   workspace: Workspace;
-  
+
   // UI State
   selectedWidgetId: string | null;
   selectedQueryId: string | null;
-  sidebarTab: 'queries' | 'widgets' | 'settings';
+  sidebarTab: 'queries' | 'widgets' | 'settings' | 'data';
   bottomPanelOpen: boolean;
   bottomPanelHeight: number;
-  
+
   // Auth actions
   login: (user: User) => void;
   logout: () => void;
-  
+
   // Actions
   setConnectionStatus: (status: ConnectionStatus) => void;
   setServerUrl: (url: string) => void;
   setAppMode: (mode: AppMode) => void;
   toggleAppMode: () => void;
-  
+
   // Query actions
   addQuery: (name: string, code: string) => string;
   updateQuery: (id: string, updates: Partial<Query>) => void;
@@ -103,25 +103,25 @@ interface LensState {
   setQueryResult: (id: string, result: unknown) => void;
   setQueryError: (id: string, error: string) => void;
   setQueryRunning: (id: string, running: boolean) => void;
-  
+
   // Dashboard actions
   addDashboard: (name: string) => string;
   updateDashboard: (id: string, updates: Partial<Dashboard>) => void;
   deleteDashboard: (id: string) => void;
   setActiveDashboard: (id: string) => void;
-  
+
   // Widget actions
   addWidget: (dashboardId: string, widget: Omit<Widget, 'id'>) => string;
   updateWidget: (dashboardId: string, widgetId: string, updates: Partial<Widget>) => void;
   deleteWidget: (dashboardId: string, widgetId: string) => void;
-  
+
   // UI actions
   setSelectedWidget: (id: string | null) => void;
   setSelectedQuery: (id: string | null) => void;
-  setSidebarTab: (tab: 'queries' | 'widgets' | 'settings') => void;
+  setSidebarTab: (tab: 'queries' | 'widgets' | 'settings' | 'data') => void;
   toggleBottomPanel: () => void;
   setBottomPanelHeight: (height: number) => void;
-  
+
   // Workspace actions
   loadWorkspace: (workspace: Workspace) => void;
   exportWorkspace: () => Workspace;
@@ -141,7 +141,7 @@ const createDefaultWorkspace = (): Workspace => {
   const tradesBySymbolId = uuid();
   const recentTradesId = uuid();
   const recentQuotesId = uuid();
-  
+
   return {
     id: uuid(),
     name: 'Trading Analytics',
@@ -170,7 +170,7 @@ const createDefaultWorkspace = (): Workspace => {
       },
       {
         id: quoteCountId,
-        name: 'Quote Count', 
+        name: 'Quote Count',
         code: '(count quotes)',
         isRunning: false,
       },
@@ -271,7 +271,7 @@ const getSavedAuth = (): User | null => {
   try {
     const saved = sessionStorage.getItem('raylens-auth');
     if (saved) return JSON.parse(saved);
-  } catch {}
+  } catch { }
   return null;
 };
 
@@ -288,7 +288,7 @@ export const useLensStore = create<LensState>()((set, get) => ({
   sidebarTab: 'queries',
   bottomPanelOpen: true,
   bottomPanelHeight: 300,
-  
+
   // Auth actions
   login: (user) => {
     sessionStorage.setItem('raylens-auth', JSON.stringify(user));
@@ -298,23 +298,23 @@ export const useLensStore = create<LensState>()((set, get) => ({
     sessionStorage.removeItem('raylens-auth');
     set({ user: null, isAuthenticated: false });
   },
-  
+
   // Connection actions
   setConnectionStatus: (status) => set({ connectionStatus: status }),
-  
+
   setServerUrl: (url) => set((state) => ({
     serverUrl: url,
     workspace: { ...state.workspace, serverUrl: url },
   })),
-  
+
   // App mode actions
   setAppMode: (mode) => set({ appMode: mode }),
-  toggleAppMode: () => set((state) => ({ 
+  toggleAppMode: () => set((state) => ({
     appMode: state.appMode === 'dev' ? 'live' : 'dev',
     // Auto-hide panels when switching to live mode
     bottomPanelOpen: state.appMode === 'live' ? state.bottomPanelOpen : false,
   })),
-  
+
   // Query actions
   addQuery: (name, code) => {
     const id = uuid();
@@ -326,7 +326,7 @@ export const useLensStore = create<LensState>()((set, get) => ({
     }));
     return id;
   },
-  
+
   updateQuery: (id, updates) => set((state) => ({
     workspace: {
       ...state.workspace,
@@ -335,14 +335,14 @@ export const useLensStore = create<LensState>()((set, get) => ({
       ),
     },
   })),
-  
+
   deleteQuery: (id) => set((state) => ({
     workspace: {
       ...state.workspace,
       queries: state.workspace.queries.filter((q) => q.id !== id),
     },
   })),
-  
+
   setQueryResult: (id, result) => {
     console.log('[Store] setQueryResult:', { id, resultType: (result as { type?: string })?.type, result });
     return set((state) => ({
@@ -356,7 +356,7 @@ export const useLensStore = create<LensState>()((set, get) => ({
       },
     }));
   },
-  
+
   setQueryError: (id, error) => set((state) => ({
     workspace: {
       ...state.workspace,
@@ -365,7 +365,7 @@ export const useLensStore = create<LensState>()((set, get) => ({
       ),
     },
   })),
-  
+
   setQueryRunning: (id, running) => set((state) => ({
     workspace: {
       ...state.workspace,
@@ -374,7 +374,7 @@ export const useLensStore = create<LensState>()((set, get) => ({
       ),
     },
   })),
-  
+
   // Dashboard actions
   addDashboard: (name) => {
     const id = uuid();
@@ -390,7 +390,7 @@ export const useLensStore = create<LensState>()((set, get) => ({
     }));
     return id;
   },
-  
+
   updateDashboard: (id, updates) => set((state) => ({
     workspace: {
       ...state.workspace,
@@ -399,7 +399,7 @@ export const useLensStore = create<LensState>()((set, get) => ({
       ),
     },
   })),
-  
+
   deleteDashboard: (id) => set((state) => {
     const dashboards = state.workspace.dashboards.filter((d) => d.id !== id);
     return {
@@ -413,11 +413,11 @@ export const useLensStore = create<LensState>()((set, get) => ({
       },
     };
   }),
-  
+
   setActiveDashboard: (id) => set((state) => ({
     workspace: { ...state.workspace, activeDashboardId: id },
   })),
-  
+
   // Widget actions
   addWidget: (dashboardId, widget) => {
     const id = uuid();
@@ -433,46 +433,46 @@ export const useLensStore = create<LensState>()((set, get) => ({
     }));
     return id;
   },
-  
+
   updateWidget: (dashboardId, widgetId, updates) => set((state) => ({
     workspace: {
       ...state.workspace,
       dashboards: state.workspace.dashboards.map((d) =>
         d.id === dashboardId
           ? {
-              ...d,
-              widgets: d.widgets.map((w) =>
-                w.id === widgetId ? { ...w, ...updates } : w
-              ),
-              updatedAt: Date.now(),
-            }
+            ...d,
+            widgets: d.widgets.map((w) =>
+              w.id === widgetId ? { ...w, ...updates } : w
+            ),
+            updatedAt: Date.now(),
+          }
           : d
       ),
     },
   })),
-  
+
   deleteWidget: (dashboardId, widgetId) => set((state) => ({
     workspace: {
       ...state.workspace,
       dashboards: state.workspace.dashboards.map((d) =>
         d.id === dashboardId
           ? {
-              ...d,
-              widgets: d.widgets.filter((w) => w.id !== widgetId),
-              updatedAt: Date.now(),
-            }
+            ...d,
+            widgets: d.widgets.filter((w) => w.id !== widgetId),
+            updatedAt: Date.now(),
+          }
           : d
       ),
     },
   })),
-  
+
   // UI actions
   setSelectedWidget: (id) => set({ selectedWidgetId: id }),
   setSelectedQuery: (id) => set({ selectedQueryId: id }),
   setSidebarTab: (tab) => set({ sidebarTab: tab }),
   toggleBottomPanel: () => set((state) => ({ bottomPanelOpen: !state.bottomPanelOpen })),
   setBottomPanelHeight: (height) => set({ bottomPanelHeight: height }),
-  
+
   // Workspace actions
   loadWorkspace: (workspace) => set({
     workspace: {
@@ -489,9 +489,9 @@ export const useLensStore = create<LensState>()((set, get) => ({
     selectedWidgetId: null,
     selectedQueryId: null,
   }),
-  
+
   exportWorkspace: () => JSON.parse(JSON.stringify(get().workspace)),
-  
+
   resetWorkspace: () => set({
     workspace: createDefaultWorkspace(),
     selectedWidgetId: null,
