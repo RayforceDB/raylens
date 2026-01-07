@@ -1308,6 +1308,93 @@ export class RayforceClient {
   }
 
   private parseError(view: DataView, offset: number): RayforceResult {
+    // New error format: ERR type (127) followed by a dict with error info
+    // Dict contains: code (symbol), message (string), and optional fields like
+    // expected, got, need, have, index, bound, name, type, limit
+    
+    // Check if next byte is a dict type (99)
+    const nextType = view.getInt8(offset);
+    
+    if (nextType === Types.DICT) {
+      // Parse error info as dict
+      offset += 1; // skip dict type byte
+      
+      // Parse keys (symbol vector)
+      const keysType = view.getInt8(offset);
+      offset += 1;
+      
+      const keys: string[] = [];
+      if (keysType === Types.SYMBOL) {
+        offset += 1; // attrs
+        const keysLen = Number(view.getBigInt64(offset, true));
+        offset += 8;
+        
+        for (let i = 0; i < keysLen && offset < view.byteLength; i++) {
+          let str = '';
+          while (offset < view.byteLength && view.getUint8(offset) !== 0) {
+            str += String.fromCharCode(view.getUint8(offset));
+            offset++;
+          }
+          offset++; // null terminator
+          keys.push(str);
+        }
+      }
+      
+      // Parse values (list)
+      const valsType = view.getInt8(offset);
+      offset += 1;
+      
+      const values: unknown[] = [];
+      if (valsType === Types.LIST) {
+        offset += 1; // attrs
+        const valsLen = Number(view.getBigInt64(offset, true));
+        offset += 8;
+        
+        for (let i = 0; i < valsLen && offset < view.byteLength; i++) {
+          const { data, bytesRead } = this.parseAnyWithSize(view, offset);
+          values.push(data);
+          offset += bytesRead;
+        }
+      }
+      
+      // Build error info dict
+      const errorInfo: Record<string, unknown> = {};
+      for (let i = 0; i < keys.length && i < values.length; i++) {
+        errorInfo[keys[i]] = values[i];
+      }
+      
+      // Format error message
+      const code = errorInfo.code || 'error';
+      const message = errorInfo.message || errorInfo.msg;
+      
+      let msg = `${code}`;
+      if (message) {
+        msg += `: ${message}`;
+      }
+      
+      // Add context from other fields
+      const details: string[] = [];
+      if (errorInfo.expected !== undefined && errorInfo.got !== undefined) {
+        details.push(`expected ${errorInfo.expected}, got ${errorInfo.got}`);
+      }
+      if (errorInfo.need !== undefined && errorInfo.have !== undefined) {
+        details.push(`need ${errorInfo.need}, have ${errorInfo.have}`);
+      }
+      if (errorInfo.index !== undefined) {
+        details.push(`at index ${errorInfo.index}`);
+      }
+      if (errorInfo.name !== undefined) {
+        details.push(`name: ${errorInfo.name}`);
+      }
+      
+      if (details.length > 0) {
+        msg += ` (${details.join(', ')})`;
+      }
+      
+      return { type: 'error', data: msg };
+    }
+    
+    // Legacy format: code byte + context + optional message
     const code = view.getUint8(offset);
     offset += 1;
     offset += 8; // skip context

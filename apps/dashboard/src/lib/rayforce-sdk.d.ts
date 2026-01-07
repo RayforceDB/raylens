@@ -21,6 +21,21 @@ declare module '/rayforce.js' {
 }
 
 declare module '/rayforce.sdk.js' {
+  /** Structured error information from Rayforce */
+  export interface ErrorInfo {
+    code: string;
+    message?: string;
+    expected?: string;
+    got?: string;
+    need?: number;
+    have?: number;
+    index?: number;
+    bound?: number;
+    name?: string;
+    type?: string;
+    limit?: number;
+  }
+
   export interface RayObject {
     readonly ptr: number;
     readonly type: number;
@@ -36,6 +51,11 @@ declare module '/rayforce.sdk.js' {
     toJS(): unknown;
     drop(): void;
     release(): number;
+  }
+
+  export interface RayError extends RayObject {
+    readonly info: ErrorInfo;
+    readonly message: string;
   }
 
   export interface Vector extends RayObject {
