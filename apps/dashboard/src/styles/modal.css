@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(4, 35, 59, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -21,7 +21,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 40px rgba(4, 35, 59, 0.2);
 }
 
 .modal-header {

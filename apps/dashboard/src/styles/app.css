@@ -21,9 +21,9 @@
 .login-grid {
   position: absolute;
   inset: 0;
-  background-image: 
-    linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+  background-image:
+    linear-gradient(rgba(4, 35, 59, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(4, 35, 59, 0.08) 1px, transparent 1px);
   background-size: 50px 50px;
   mask-image: radial-gradient(ellipse at center, black 0%, transparent 70%);
 }
@@ -37,10 +37,10 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
-  box-shadow: 
-    0 4px 6px -1px rgba(0, 0, 0, 0.3),
-    0 10px 15px -3px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  box-shadow:
+    0 4px 6px -1px rgba(4, 35, 59, 0.1),
+    0 10px 15px -3px rgba(4, 35, 59, 0.1),
+    0 0 0 1px rgba(4, 35, 59, 0.03) inset;
 }
 
 .login-header {
@@ -67,7 +67,7 @@
   font-size: 32px;
   font-weight: 400;
   letter-spacing: 4px;
-  color: #38bdf8;
+  color: var(--rf-gold);
 }
 
 .login-subtitle {
@@ -128,7 +128,7 @@
 
 .login-button {
   padding: 12px 24px;
-  background: linear-gradient(135deg, var(--accent-blue), #6366f1);
+  background: linear-gradient(135deg, var(--rf-navy), var(--rf-navy-light));
   border: none;
   border-radius: 8px;
   color: white;
@@ -144,7 +144,7 @@
 
 .login-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(4, 35, 59, 0.3);
 }
 
 .login-button:active:not(:disabled) {
@@ -282,7 +282,7 @@
   font-size: 18px;
   font-weight: 400;
   letter-spacing: 2px;
-  color: #38bdf8;
+  color: var(--rf-gold);
 }
 
 .header-divider {
@@ -385,6 +385,42 @@
   font-size: 11px;
 }
 
+/* FPS Counter */
+.fps-counter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.fps-value {
+  font-weight: 600;
+  min-width: 24px;
+  text-align: right;
+}
+
+.fps-label {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.fps-good {
+  color: var(--accent-green);
+}
+
+.fps-medium {
+  color: var(--accent-amber);
+}
+
+.fps-low {
+  color: var(--accent-red);
+}
+
 /* User menu */
 .user-menu {
   display: flex;
@@ -411,7 +447,7 @@
 }
 
 .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(4, 35, 59, 0.08);
   color: var(--text-secondary);
 }
 
@@ -762,7 +798,7 @@
 .widget.dragging {
   opacity: 0.9;
   z-index: 100;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 32px rgba(4, 35, 59, 0.25);
   border-color: var(--accent-blue);
   will-change: transform;
   cursor: grabbing;
@@ -1265,7 +1301,7 @@
 
 /* Live Mode App Container */
 .app-container.live-mode {
-  --bg-base: #000;
+  --bg-base: #f0f2f5;
 }
 
 .app-container.live-mode .app-main {
@@ -1274,37 +1310,37 @@
 
 /* Live Mode Header */
 .header.live-mode {
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .header.live-mode .header-logo {
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 .header.live-mode .header-logo span {
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
 .header.live-mode .header-divider {
-  opacity: 0.3;
+  opacity: 0.5;
 }
 
 /* Widget in live mode */
 .widget.live-mode {
-  border-color: rgba(255, 255, 255, 0.05);
-  box-shadow: none;
-  background: rgba(18, 18, 26, 0.8);
+  border-color: var(--border-subtle);
+  box-shadow: 0 1px 3px rgba(4, 35, 59, 0.08);
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .widget.live-mode:hover {
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-strong);
 }
 
 .widget-header.live-mode {
   background: transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
   padding: 6px 12px;
   min-height: auto;
 }
@@ -1330,7 +1366,7 @@
 
 /* Dashboard canvas in live mode */
 .live-mode .dashboard-canvas {
-  background: #000;
+  background: #f0f2f5;
   background-image: none;
   padding: 8px;
 }
@@ -1358,6 +1394,6 @@
 }
 
 .live-mode .dashboard-tab.active {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(4, 35, 59, 0.1);
+  border-color: var(--border-strong);
 }

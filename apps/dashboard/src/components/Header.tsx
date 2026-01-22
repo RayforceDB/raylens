@@ -1,13 +1,44 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLensStore } from '../store';
 import { toast, confirm } from './Toast';
-import { 
-  saveWorkspaceToStorage, 
-  exportWorkspaceToFile, 
+import {
+  saveWorkspaceToStorage,
+  exportWorkspaceToFile,
   importWorkspaceFromFile,
   getShareUrl,
   clearWorkspaceStorage,
 } from '../lib/workspace';
+
+// FPS counter hook
+function useFps() {
+  const [fps, setFps] = useState(0);
+  const frameCount = useRef(0);
+  const lastTime = useRef(performance.now());
+  const rafId = useRef<number>();
+
+  useEffect(() => {
+    const updateFps = () => {
+      frameCount.current++;
+      const now = performance.now();
+      const delta = now - lastTime.current;
+
+      if (delta >= 1000) {
+        setFps(Math.round((frameCount.current * 1000) / delta));
+        frameCount.current = 0;
+        lastTime.current = now;
+      }
+
+      rafId.current = requestAnimationFrame(updateFps);
+    };
+
+    rafId.current = requestAnimationFrame(updateFps);
+    return () => {
+      if (rafId.current) cancelAnimationFrame(rafId.current);
+    };
+  }, []);
+
+  return fps;
+}
 
 interface HeaderProps {
   onConnect: () => void;
@@ -25,7 +56,8 @@ export function Header({ onConnect }: HeaderProps) {
   
   const [editingUrl, setEditingUrl] = useState(false);
   const [urlValue, setUrlValue] = useState(serverUrl);
-  
+  const fps = useFps();
+
   const handleUrlSubmit = () => {
     setServerUrl(urlValue);
     setEditingUrl(false);
@@ -38,24 +70,12 @@ export function Header({ onConnect }: HeaderProps) {
     <header className={`header ${appMode}-mode`}>
       <div className="header-left">
         <div className="header-logo">
-          <svg viewBox="0 0 64 64" fill="none">
-            <defs>
-              <linearGradient id="rayGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#38bdf8" />
-                <stop offset="100%" stopColor="#0284c7" />
-              </linearGradient>
-            </defs>
-            <circle cx="32" cy="32" r="28" fill="none" stroke="url(#rayGrad)" strokeWidth="4"/>
-            <circle cx="32" cy="32" r="16" fill="url(#rayGrad)" opacity="0.3"/>
-            <circle cx="32" cy="32" r="8" fill="url(#rayGrad)"/>
-            <g stroke="url(#rayGrad)" strokeWidth="2" strokeLinecap="round">
-              <line x1="32" y1="4" x2="32" y2="12"/>
-              <line x1="32" y1="52" x2="32" y2="60"/>
-              <line x1="4" y1="32" x2="12" y2="32"/>
-              <line x1="52" y1="32" x2="60" y2="32"/>
-            </g>
-          </svg>
-          <span className="brand-text">RAYLENS</span>
+          <img
+            src="/assets/logo_dark_full.svg"
+            alt="Rayforce DB"
+            className="logo"
+            style={{ height: 36 }}
+          />
         </div>
         
         <div className="header-divider" />
@@ -136,13 +156,21 @@ export function Header({ onConnect }: HeaderProps) {
             </span>
           )}
         </div>
-        
+
+        {/* FPS Counter */}
+        <div className="fps-counter" title="Frames per second">
+          <span className={`fps-value ${fps < 30 ? 'fps-low' : fps < 50 ? 'fps-medium' : 'fps-good'}`}>
+            {fps}
+          </span>
+          <span className="fps-label">FPS</span>
+        </div>
+
         {connectionStatus !== 'connected' && (
           <button className="btn btn-primary btn-sm" onClick={onConnect}>
             Connect
           </button>
         )}
-        
+
         {/* Dev Mode Actions */}
         {isDevMode && (
           <>

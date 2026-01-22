@@ -541,7 +541,7 @@ export function registerRayfallLanguage(monacoInstance: typeof monaco) {
     },
   });
   
-  // Define custom theme colors for Rayfall
+  // Define custom dark theme colors for Rayfall
   monacoInstance.editor.defineTheme('rayfall-dark', {
     base: 'vs-dark',
     inherit: true,
@@ -574,6 +574,42 @@ export function registerRayfallLanguage(monacoInstance: typeof monaco) {
       'editorCursor.foreground': '#3b82f6',
       'editorBracketMatch.background': '#3b82f633',
       'editorBracketMatch.border': '#3b82f6',
+    },
+  });
+
+  // Define custom light theme colors for Rayfall (Rayforce brand)
+  monacoInstance.editor.defineTheme('rayfall-light', {
+    base: 'vs',
+    inherit: true,
+    rules: [
+      { token: 'keyword', foreground: '0a3a5c', fontStyle: 'bold' },
+      { token: 'operator', foreground: '04233b' },
+      { token: 'operator.colon', foreground: 'e9a033' },
+      { token: 'variable.name', foreground: '0a3a5c' },
+      { token: 'string', foreground: 'a31515' },
+      { token: 'number', foreground: '098658' },
+      { token: 'number.date', foreground: '098658' },
+      { token: 'number.time', foreground: '098658' },
+      { token: 'comment', foreground: '6a9955', fontStyle: 'italic' },
+      { token: 'annotation', foreground: 'e9a033', fontStyle: 'italic' },
+      { token: 'type', foreground: '267f99' },
+      { token: 'identifier', foreground: '04233b' },
+      { token: 'constant.null', foreground: '0000ff' },
+      { token: 'constant.infinity', foreground: '0000ff' },
+      { token: 'delimiter.parenthesis', foreground: 'e9a033' },
+      { token: 'delimiter.brace', foreground: '0a3a5c' },
+      { token: 'delimiter.bracket', foreground: '3b82f6' },
+    ],
+    colors: {
+      'editor.background': '#ffffff',
+      'editor.foreground': '#04233b',
+      'editorLineNumber.foreground': '#757575',
+      'editorLineNumber.activeForeground': '#0a3a5c',
+      'editor.selectionBackground': '#3b82f633',
+      'editor.lineHighlightBackground': '#04233b08',
+      'editorCursor.foreground': '#e9a033',
+      'editorBracketMatch.background': '#e9a03333',
+      'editorBracketMatch.border': '#e9a033',
     },
   });
 }

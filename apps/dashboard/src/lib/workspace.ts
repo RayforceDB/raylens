@@ -168,33 +168,3 @@ export function parseShareUrl(): Workspace | null {
   return null;
 }
 
-// ============================================================================
-// DEMO WORKSPACES
-// ============================================================================
-
-export const DEMO_WORKSPACES = {
-  orders: {
-    name: 'Orders Dashboard',
-    description: 'Trade blotter with order analytics',
-  },
-  trading: {
-    name: 'Trading Analytics',
-    description: 'Real-time trading dashboard with PnL',
-  },
-  iot: {
-    name: 'IoT Monitoring',
-    description: 'Sensor data monitoring dashboard',
-  },
-};
-
-export async function loadDemoWorkspace(name: string): Promise<Workspace | null> {
-  try {
-    const response = await fetch(`/workspaces/${name}.json`);
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch (err) {
-    console.error('[Workspace] Failed to load demo:', err);
-  }
-  return null;
-}

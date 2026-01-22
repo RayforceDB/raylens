@@ -263,7 +263,7 @@ function QueryEditorPanel({ isFullscreen = false }: { isFullscreen?: boolean }) 
           <Editor
             height="100%"
             language={RAYFALL_LANGUAGE_ID}
-            theme="rayfall-dark"
+            theme="rayfall-light"
             value={localCode}
             onChange={handleEditorChange}
             beforeMount={(monacoInstance) => {

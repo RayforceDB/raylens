@@ -30,24 +30,12 @@ export function Login() {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          <svg className="login-logo" viewBox="0 0 64 64" fill="none">
-            <defs>
-              <linearGradient id="loginGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#38bdf8" />
-                <stop offset="100%" stopColor="#0284c7" />
-              </linearGradient>
-            </defs>
-            <circle cx="32" cy="32" r="28" fill="none" stroke="url(#loginGrad)" strokeWidth="4"/>
-            <circle cx="32" cy="32" r="16" fill="url(#loginGrad)" opacity="0.3"/>
-            <circle cx="32" cy="32" r="8" fill="url(#loginGrad)"/>
-            <g stroke="url(#loginGrad)" strokeWidth="2" strokeLinecap="round">
-              <line x1="32" y1="4" x2="32" y2="12"/>
-              <line x1="32" y1="52" x2="32" y2="60"/>
-              <line x1="4" y1="32" x2="12" y2="32"/>
-              <line x1="52" y1="32" x2="60" y2="32"/>
-            </g>
-          </svg>
-          <h1 className="brand-text">RAYLENS</h1>
+          <img
+            src="/assets/logo_dark_full.svg"
+            alt="Rayforce DB"
+            className="login-logo"
+            style={{ height: 64 }}
+          />
           <p className="login-subtitle">Reactive Analytics Dashboard</p>
         </div>
 

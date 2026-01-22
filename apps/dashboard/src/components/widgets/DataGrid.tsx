@@ -816,7 +816,7 @@ export function DataGridWidget({
   
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div className="ag-theme-alpine-dark" style={{ flex: 1, minHeight: 0 }}>
+      <div className="ag-theme-alpine" style={{ flex: 1, minHeight: 0 }}>
         <AgGridReact
           key={gridKey}
           rowData={rowData}
