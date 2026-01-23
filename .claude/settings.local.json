@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(npm run:*)",
+      "Bash(grep:*)",
+      "Bash(xargs -I {} bash -c 'echo \"\"\"\"=== {} ===\"\"\"\" && grep -A3 -B1 \"\"\"\"count\\\\|first\\\\|last\"\"\"\" {}')",
+      "Bash(npm install:*)",
+      "Bash(sudo snap install:*)",
+      "Bash(export PATH=\"$HOME/flutter/bin:$PATH\")",
+      "Bash(flutter --version:*)",
+      "Bash(flutter pub get:*)",
+      "Bash(dart run build_runner:*)",
+      "Bash(flutter create:*)",
+      "Bash(flutter doctor:*)",
+      "Bash(flutter run:*)",
+      "Bash(g++:*)",
+      "Bash(export CXX=/usr/bin/g++)",
+      "Bash(export CC=/usr/bin/gcc:*)",
+      "Bash(nm -D:*)",
+      "Bash(nm:*)",
+      "Bash(ls:*)",
+      "Bash(make:*)",
+      "Bash(flutter build:*)"
+    ]
+  }
+}
