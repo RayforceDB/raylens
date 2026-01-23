@@ -134,127 +134,71 @@ interface LensState {
 
 const createDefaultWorkspace = (): Workspace => {
   const dashboardId = uuid();
-  const tradeCountId = uuid();
-  const quoteCountId = uuid();
-  const tradeColumnsId = uuid();
-  const quoteColumnsId = uuid();
-  const tradesBySymbolId = uuid();
-  const recentTradesId = uuid();
-  const recentQuotesId = uuid();
+  const basicMathId = uuid();
+  const vectorOpId = uuid();
+  const aggSumId = uuid();
 
   return {
     id: uuid(),
-    name: 'Trading Analytics',
-    serverUrl: 'ws://localhost:8765',
+    name: 'Rayfall Workspace',
+    serverUrl: 'native',
     activeDashboardId: dashboardId,
     queries: [
-      // Schema exploration queries - (key table) returns column names
+      // Basic math
       {
-        id: tradeColumnsId,
-        name: 'Trade Schema',
-        code: '(key trades)',
+        id: basicMathId,
+        name: 'Basic Math',
+        code: '(+ 1 2 3)',
         isRunning: false,
       },
+      // Vector operations
       {
-        id: quoteColumnsId,
-        name: 'Quote Schema',
-        code: '(key quotes)',
+        id: vectorOpId,
+        name: 'Vector Ops',
+        code: '(* [1 2 3 4 5] 10)',
         isRunning: false,
       },
-      // Count queries
+      // Aggregation
       {
-        id: tradeCountId,
-        name: 'Trade Count',
-        code: '(count trades)',
-        isRunning: false,
-      },
-      {
-        id: quoteCountId,
-        name: 'Quote Count',
-        code: '(count quotes)',
-        isRunning: false,
-      },
-      // Aggregation query - run (cols trades) first to see column names!
-      {
-        id: tradesBySymbolId,
-        name: 'Trades Grouped',
-        code: ';; First run: (cols trades) to see column names\n;; Then update COLUMN_NAME below:\n(select {\n  cnt: (count COLUMN_NAME)\n  from: trades\n  by: COLUMN_NAME})',
-        isRunning: false,
-      },
-      // Recent data - (take collection -n) for last n items
-      {
-        id: recentTradesId,
-        name: 'Recent Trades',
-        code: '(take trades -10)',
-        isRunning: false,
-      },
-      {
-        id: recentQuotesId,
-        name: 'Recent Quotes',
-        code: '(take quotes -10)',
+        id: aggSumId,
+        name: 'Sum Vector',
+        code: '(sum [1 2 3 4 5])',
         isRunning: false,
       },
     ],
     dashboards: [
       {
         id: dashboardId,
-        name: 'Trading Dashboard',
+        name: 'Main Dashboard',
         createdAt: Date.now(),
         updatedAt: Date.now(),
         widgets: [
-          // Grid: Recent Trades - shows actual table structure
-          {
-            id: uuid(),
-            type: 'grid',
-            title: 'Recent Trades',
-            binding: { queryId: recentTradesId, refreshInterval: 5000, autoRun: true },
-            config: {},
-            position: { x: 0, y: 0, w: 6, h: 4 },
-          },
-          // Grid: Recent Quotes
-          {
-            id: uuid(),
-            type: 'grid',
-            title: 'Recent Quotes',
-            binding: { queryId: recentQuotesId, refreshInterval: 5000, autoRun: true },
-            config: {},
-            position: { x: 6, y: 0, w: 6, h: 4 },
-          },
-          // Text: Total Trade Count
+          // Text widget for basic math result
           {
             id: uuid(),
             type: 'text',
-            title: 'Total Trades',
-            binding: { queryId: tradeCountId, refreshInterval: 5000, autoRun: true },
-            config: { fontSize: 48, prefix: '', suffix: ' trades' },
-            position: { x: 0, y: 4, w: 3, h: 2 },
+            title: 'Sum: 1+2+3',
+            binding: { queryId: basicMathId, refreshInterval: 0, autoRun: false },
+            config: { fontSize: 48, prefix: '= ', suffix: '' },
+            position: { x: 0, y: 0, w: 4, h: 2 },
           },
-          // Text: Total Quote Count  
+          // Text widget for aggregation
           {
             id: uuid(),
             type: 'text',
-            title: 'Total Quotes',
-            binding: { queryId: quoteCountId, refreshInterval: 5000, autoRun: true },
-            config: { fontSize: 48, prefix: '', suffix: ' quotes' },
-            position: { x: 3, y: 4, w: 3, h: 2 },
+            title: 'Sum of Vector',
+            binding: { queryId: aggSumId, refreshInterval: 0, autoRun: false },
+            config: { fontSize: 48, prefix: '= ', suffix: '' },
+            position: { x: 4, y: 0, w: 4, h: 2 },
           },
-          // Grid: Trade Schema - shows available columns
+          // Grid for vector output
           {
             id: uuid(),
             type: 'grid',
-            title: 'Trade Columns',
-            binding: { queryId: tradeColumnsId, refreshInterval: 0, autoRun: true },
+            title: 'Vector * 10',
+            binding: { queryId: vectorOpId, refreshInterval: 0, autoRun: false },
             config: {},
-            position: { x: 6, y: 4, w: 3, h: 2 },
-          },
-          // Grid: Quote Schema - shows available columns
-          {
-            id: uuid(),
-            type: 'grid',
-            title: 'Quote Columns',
-            binding: { queryId: quoteColumnsId, refreshInterval: 0, autoRun: true },
-            config: {},
-            position: { x: 9, y: 4, w: 3, h: 2 },
+            position: { x: 8, y: 0, w: 4, h: 2 },
           },
         ],
       },
@@ -277,8 +221,8 @@ const getSavedAuth = (): User | null => {
 
 export const useLensStore = create<LensState>()((set, get) => ({
   // Initial state
-  user: getSavedAuth(),
-  isAuthenticated: getSavedAuth() !== null,
+  user: getSavedAuth() || { username: 'dev', role: 'admin' as const },
+  isAuthenticated: true, // Skip login for native Tauri app
   connectionStatus: 'disconnected',
   serverUrl: 'ws://localhost:8765',
   appMode: 'dev',

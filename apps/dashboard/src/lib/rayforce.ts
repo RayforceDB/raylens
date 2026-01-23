@@ -6,7 +6,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import { logInfo, logError, logDebug } from './logger';
+import { logInfo, logError, logDebug, logWarn } from './logger';
 
 // =============================================================================
 // Types
@@ -33,7 +33,10 @@ export interface RayforceResult {
   columnTypes?: Record<string, string>;
   rowCount?: number;
   executionTime?: number;
-  source: 'native';
+  source: 'local' | 'remote' | 'native';
+
+  /** Convert result to JS object (for backwards compatibility) */
+  toJS?: () => unknown;
 }
 
 /** Scalar result for quick queries */
@@ -88,7 +91,8 @@ export async function execute(code: string): Promise<RayforceResult> {
         type: 'error',
         data: 'Query error',
         executionTime: execTime,
-        source: 'native',
+        source: 'local',
+        toJS: () => 'Query error',
       };
     }
 
@@ -104,7 +108,8 @@ export async function execute(code: string): Promise<RayforceResult> {
         columnTypes: meta.columnTypes,
         rowCount: meta.rowCount,
         executionTime: execTime,
-        source: 'native',
+        source: 'local',
+        toJS: () => rows,
       };
     }
 
@@ -112,18 +117,21 @@ export async function execute(code: string): Promise<RayforceResult> {
     const rows = await getRows(meta.handle, 0, 1);
     await releaseHandle(meta.handle);
 
+    const value = rows[0] ?? null;
     return {
       type: meta.resultType as 'scalar' | 'vector',
-      data: rows[0] ?? null,
+      data: value,
       executionTime: execTime,
-      source: 'native',
+      source: 'local',
+      toJS: () => value,
     };
   } catch (error) {
     return {
       type: 'error',
       data: String(error),
       executionTime: performance.now() - startTime,
-      source: 'native',
+      source: 'local',
+      toJS: () => String(error),
     };
   }
 }
@@ -186,13 +194,16 @@ export async function cancelQuery(queryId: string): Promise<void> {
 // Client Class (for backwards compatibility)
 // =============================================================================
 
+type EventCallback = (data: unknown) => void;
+
 /**
  * RayforceClient class for backwards compatibility
  *
  * Most code should use the standalone functions directly.
  */
 export class RayforceClient {
-  private handles: Map<string, number> = new Map();
+  private eventListeners: Map<string, Set<EventCallback>> = new Map();
+  private connected = false;
 
   constructor() {
     logInfo('Rayforce', 'Native Tauri client initialized');
@@ -207,25 +218,28 @@ export class RayforceClient {
   }
 
   /**
-   * Connect - no-op for Tauri (embedded, no server)
+   * Connect - simulates connection for backwards compatibility
    */
   async connect(_url: string): Promise<void> {
-    // No-op - Rayforce is embedded in the Tauri app
+    // Rayforce is embedded, so we just emit connected event
     logInfo('Rayforce', 'Connected (embedded)');
+    this.connected = true;
+    this.emit('connected', { version: 1 });
   }
 
   /**
    * Disconnect - no-op for Tauri
    */
   disconnect(): void {
-    // No-op
+    this.connected = false;
+    this.emit('disconnected', null);
   }
 
   /**
    * Check if connected - always true for embedded
    */
   isConnected(): boolean {
-    return true;
+    return this.connected;
   }
 
   /**
@@ -238,14 +252,49 @@ export class RayforceClient {
   /**
    * Execute locally - same as execute for embedded
    */
-  evalLocal(code: string): RayforceResult {
+  evalLocal(_code: string): RayforceResult {
     // For backwards compatibility, but this should be async
     // Returning a placeholder - actual implementation should use execute()
     return {
       type: 'error',
       data: 'Use execute() for async queries',
-      source: 'native',
+      source: 'local',
+      toJS: () => 'Use execute() for async queries',
     };
+  }
+
+  /**
+   * Load CSV data into a table variable
+   */
+  async loadCSV(name: string, content: string): Promise<void> {
+    logInfo('Rayforce', `Loading CSV into table '${name}' (${content.length} bytes)`);
+    // For now, this is a placeholder - would need backend support
+    // Could implement by sending CSV to backend to parse
+    logWarn('Rayforce', 'loadCSV not yet implemented for Tauri');
+  }
+
+  /**
+   * Register event listener
+   */
+  on(event: string, callback: EventCallback): void {
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, new Set());
+    }
+    this.eventListeners.get(event)!.add(callback);
+  }
+
+  /**
+   * Remove event listener
+   */
+  off(event: string, callback: EventCallback): void {
+    this.eventListeners.get(event)?.delete(callback);
+  }
+
+  /**
+   * Emit event to listeners
+   */
+  private emit(event: string, data: unknown): void {
+    this.eventListeners.get(event)?.forEach(cb => cb(data));
   }
 }
 

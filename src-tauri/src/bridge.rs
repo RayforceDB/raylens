@@ -11,8 +11,7 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::CString;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 use tokio::sync::{mpsc, oneshot};
 
@@ -22,6 +21,7 @@ use tokio::sync::{mpsc, oneshot};
 
 /// Metadata about a query result
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct QueryMeta {
     pub handle: u64,
     pub columns: Vec<String>,
@@ -73,10 +73,10 @@ pub enum RayResponse {
 pub struct RayforceBridge {
     /// Channel to send commands to Rayforce thread
     command_tx: mpsc::UnboundedSender<RayCommand>,
+    /// Receiver stored until thread starts
+    command_rx: Mutex<Option<mpsc::UnboundedReceiver<RayCommand>>>,
     /// Handle to the Rayforce thread
     thread_handle: Mutex<Option<JoinHandle<()>>>,
-    /// Next handle ID
-    next_handle: AtomicU64,
     /// Whether the bridge is running
     running: AtomicBool,
     /// Cancelled query IDs (checked before storing results)
@@ -90,15 +90,11 @@ impl RayforceBridge {
 
         let bridge = Self {
             command_tx,
+            command_rx: Mutex::new(Some(command_rx)),
             thread_handle: Mutex::new(None),
-            next_handle: AtomicU64::new(1),
             running: AtomicBool::new(false),
             cancelled: Mutex::new(std::collections::HashSet::new()),
         };
-
-        // Store the receiver for later use when starting
-        // We need to move it into the thread, so we'll recreate channels in start()
-        drop(command_rx);
 
         Ok(bridge)
     }
@@ -109,24 +105,15 @@ impl RayforceBridge {
             return; // Already running
         }
 
-        // Create new channel since we dropped the old receiver
-        let (tx, rx) = mpsc::unbounded_channel();
+        // Take the receiver from storage
+        let rx = self.command_rx.lock().take()
+            .expect("start() called but receiver already taken");
 
-        // This is a bit hacky - we need to update the sender
-        // In practice, we'd restructure this, but for now we'll just spawn
         let handle = thread::spawn(move || {
             rayforce_thread_main(rx);
         });
 
         *self.thread_handle.lock() = Some(handle);
-
-        // Note: In a real implementation, we'd need to update self.command_tx
-        // For now, commands won't work until we fix this architecture
-    }
-
-    /// Get the next handle ID
-    fn next_handle_id(&self) -> u64 {
-        self.next_handle.fetch_add(1, Ordering::SeqCst)
     }
 
     /// Execute a query
@@ -296,7 +283,6 @@ fn execute_query_impl(
     log::debug!("Executing query: {}", code);
 
     let c_code = CString::new(code).map_err(|e| format!("Invalid query string: {}", e))?;
-
     let result = unsafe { rayforce_ffi::eval_str(c_code.as_ptr()) };
 
     if result.is_null() {
@@ -305,8 +291,8 @@ fn execute_query_impl(
 
     // Check for error
     let obj = unsafe { &*result };
+
     if obj.is_error() {
-        // Extract error message
         let err_msg = extract_error_message(result);
         unsafe { rayforce_ffi::drop_obj(result) };
         return Err(err_msg);
@@ -333,21 +319,32 @@ fn execute_query_impl(
 /// Extract metadata from a query result
 fn extract_query_meta(handle: u64, obj: ObjP) -> Result<QueryMeta, String> {
     let obj_ref = unsafe { &*obj };
+    let type_code = obj_ref.type_;
 
-    let result_type = match obj_ref.type_ {
+    let result_type = match type_code {
         TYPE_TABLE => "table",
         TYPE_ERR => "error",
-        t if t < 0 => "scalar",
-        t if t >= 0 && t <= 12 => "vector",
         99 => "dict",
+        0 => "list",
+        t if t < 0 => "scalar",
+        t if t >= 1 && t <= 12 => "vector",
         _ => "unknown",
     }
     .to_string();
 
-    let (columns, column_types, row_count) = if obj_ref.is_table() {
-        extract_table_meta(obj)?
-    } else {
-        (vec![], HashMap::new(), 0)
+    let (columns, column_types, row_count) = match type_code {
+        TYPE_TABLE => extract_table_meta(obj)?,
+        99 => extract_dict_meta(obj)?,
+        t if t < 0 => {
+            // Scalar - 1 row with "value" column
+            (vec!["value".to_string()], HashMap::new(), 1)
+        }
+        t if t >= 0 && t <= 12 => {
+            // Vector/list - length rows with "value" column
+            let len = unsafe { obj_ref.len() as u64 };
+            (vec!["value".to_string()], HashMap::new(), len)
+        }
+        _ => (vec![], HashMap::new(), 0),
     };
 
     Ok(QueryMeta {
@@ -361,22 +358,123 @@ fn extract_query_meta(handle: u64, obj: ObjP) -> Result<QueryMeta, String> {
 
 /// Extract table metadata (columns, types, row count)
 fn extract_table_meta(obj: ObjP) -> Result<(Vec<String>, HashMap<String, String>, u64), String> {
-    // For now, return placeholder - actual implementation would parse table structure
-    // This requires more FFI work to access table column names and types
+    // Get keys (column names) from table
+    let keys = unsafe { rayforce_ffi::ray_key(obj) };
+    if keys.is_null() {
+        return Ok((vec![], HashMap::new(), 0));
+    }
 
-    // Get row count from table length
-    let row_count = unsafe { (*obj).len() as u64 };
+    let keys_ref = unsafe { &*keys };
+    let num_cols = unsafe { keys_ref.len() as usize };
 
-    // TODO: Extract actual column names and types from table structure
-    // This requires accessing the table's keys (symbol vector) and values (list of vectors)
+    let mut columns = Vec::with_capacity(num_cols);
+    let mut column_types = HashMap::new();
 
-    Ok((vec![], HashMap::new(), row_count))
+    // Extract column names from symbol vector
+    for i in 0..num_cols {
+        let col_sym = unsafe { rayforce_ffi::at_idx(keys, i as i64) };
+        if !col_sym.is_null() {
+            let col_name = symbol_to_string(col_sym);
+            columns.push(col_name);
+        }
+    }
+
+    // Get values to determine row count
+    let values = unsafe { rayforce_ffi::ray_value(obj) };
+    let row_count = if !values.is_null() {
+        // Values is a list of column vectors, get length of first column
+        let first_col = unsafe { rayforce_ffi::at_idx(values, 0) };
+        if !first_col.is_null() {
+            let first_ref = unsafe { &*first_col };
+            if first_ref.is_vector() || first_ref.is_list() {
+                unsafe { first_ref.len() as u64 }
+            } else {
+                0
+            }
+        } else {
+            0
+        }
+    } else {
+        0
+    };
+
+    Ok((columns, column_types, row_count))
+}
+
+/// Extract dict metadata
+fn extract_dict_meta(obj: ObjP) -> Result<(Vec<String>, HashMap<String, String>, u64), String> {
+    let keys = unsafe { rayforce_ffi::ray_key(obj) };
+    if keys.is_null() {
+        return Ok((vec![], HashMap::new(), 0));
+    }
+
+    let keys_ref = unsafe { &*keys };
+    let num_keys = unsafe { keys_ref.len() as usize };
+
+    let mut columns = Vec::with_capacity(num_keys);
+    for i in 0..num_keys {
+        let ray_key = unsafe { rayforce_ffi::at_idx(keys, i as i64) };
+        if !ray_key.is_null() {
+            columns.push(symbol_to_string(ray_key));
+        }
+    }
+
+    // Dict has 1 "row"
+    Ok((columns, HashMap::new(), 1))
+}
+
+/// Convert symbol object to string
+fn symbol_to_string(obj: ObjP) -> String {
+    if obj.is_null() {
+        return String::new();
+    }
+    let obj_ref = unsafe { &*obj };
+
+    // For symbol atoms (type -6), the data is a pointer to the interned string
+    if obj_ref.type_ == -6 {
+        // Symbol data is stored differently - use eval to convert
+        // For now, use a simple index-based name
+        format!("col_{}", unsafe { obj_ref.as_i64() })
+    } else if obj_ref.type_ == 12 || obj_ref.type_ == -12 {
+        // C8 vector or char - it's a string
+        let len = if obj_ref.type_ > 0 {
+            unsafe { obj_ref.len() as usize }
+        } else {
+            1
+        };
+        if len == 0 {
+            return String::new();
+        }
+        // Read the string data
+        let data_ptr = unsafe { obj_ref.data_ptr::<u8>() };
+        if data_ptr.is_null() {
+            return String::new();
+        }
+        let bytes = unsafe { std::slice::from_raw_parts(data_ptr, len) };
+        String::from_utf8_lossy(bytes).to_string()
+    } else {
+        format!("col_{}", obj_ref.type_)
+    }
 }
 
 /// Extract error message from an error object
 fn extract_error_message(obj: ObjP) -> String {
-    // For now, return generic error - actual implementation would parse error structure
-    // The error object is a dict with code, message, etc.
+    if obj.is_null() {
+        return "Unknown error".to_string();
+    }
+
+    // Try to get the 'msg' or 'message' key from the error dict
+    let msg_key = CString::new("msg").unwrap();
+    let msg = unsafe { rayforce_ffi::at_sym(obj, msg_key.as_ptr(), 3) };
+
+    if !msg.is_null() {
+        let msg_ref = unsafe { &*msg };
+        if msg_ref.type_ == 12 {
+            // C8 vector (string)
+            return symbol_to_string(msg);
+        }
+    }
+
     "Query execution error".to_string()
 }
 
@@ -392,44 +490,213 @@ fn get_rows_impl(
         .ok_or_else(|| format!("Invalid handle: {}", handle))?;
 
     let obj_ref = unsafe { &**obj };
+    let type_code = obj_ref.type_;
 
-    if !obj_ref.is_table() {
-        return Err("Handle does not point to a table".to_string());
+    // Handle different types
+    match type_code {
+        t if t < 0 => {
+            // Scalar - return single row with value
+            if start > 0 {
+                return Ok(vec![]);
+            }
+            let mut row = HashMap::new();
+            row.insert("value".to_string(), obj_to_json(*obj)?);
+            Ok(vec![row])
+        }
+        t if t >= 0 && t <= 12 => {
+            // Vector - return elements as rows
+            let total = unsafe { obj_ref.len() as u64 };
+            let actual_count = std::cmp::min(count, total.saturating_sub(start));
+            let mut rows = Vec::with_capacity(actual_count as usize);
+
+            for i in 0..actual_count {
+                let idx = start + i;
+                let elem = unsafe { rayforce_ffi::at_idx(*obj, idx as i64) };
+                let mut row = HashMap::new();
+                row.insert("value".to_string(), obj_to_json(elem)?);
+                rows.push(row);
+            }
+            Ok(rows)
+        }
+        TYPE_TABLE => {
+            // Table - get rows by index
+            get_table_rows(*obj, start, count)
+        }
+        99 => {
+            // Dict - return as single row
+            if start > 0 {
+                return Ok(vec![]);
+            }
+            let row = dict_to_row(*obj)?;
+            Ok(vec![row])
+        }
+        _ => Err(format!("Unsupported type: {}", type_code)),
+    }
+}
+
+/// Get rows from a table
+fn get_table_rows(obj: ObjP, start: u64, count: u64) -> Result<Vec<Row>, String> {
+    let keys = unsafe { rayforce_ffi::ray_key(obj) };
+    let values = unsafe { rayforce_ffi::ray_value(obj) };
+
+    if keys.is_null() || values.is_null() {
+        return Ok(vec![]);
     }
 
-    // Use Rayfall's take/drop to get the slice
-    // (take (drop table start) count)
-    let slice_code = format!("(take (drop __h{} {}) {})", handle, start, count);
+    let keys_ref = unsafe { &*keys };
+    let num_cols = unsafe { keys_ref.len() as usize };
 
-    // For now, we can't easily evaluate this because the handle isn't in Rayforce's namespace
-    // We need to iterate rows directly using at_idx
+    // Get column names
+    let mut col_names = Vec::with_capacity(num_cols);
+    for i in 0..num_cols {
+        let col_sym = unsafe { rayforce_ffi::at_idx(keys, i as i64) };
+        col_names.push(symbol_to_string(col_sym));
+    }
 
-    let total_rows = unsafe { obj_ref.len() as u64 };
+    // Get row count from first column
+    let first_col = unsafe { rayforce_ffi::at_idx(values, 0) };
+    if first_col.is_null() {
+        return Ok(vec![]);
+    }
+    let first_ref = unsafe { &*first_col };
+    let total_rows = unsafe { first_ref.len() as u64 };
     let actual_count = std::cmp::min(count, total_rows.saturating_sub(start));
 
     let mut rows = Vec::with_capacity(actual_count as usize);
 
-    for i in 0..actual_count {
-        let row_idx = start + i;
-        let row_obj = unsafe { rayforce_ffi::at_idx(*obj, row_idx as i64) };
+    for row_idx in 0..actual_count {
+        let idx = start + row_idx;
+        let mut row = HashMap::new();
 
-        if row_obj.is_null() {
-            continue;
+        for col_idx in 0..num_cols {
+            let col_vec = unsafe { rayforce_ffi::at_idx(values, col_idx as i64) };
+            if !col_vec.is_null() {
+                let elem = unsafe { rayforce_ffi::at_idx(col_vec, idx as i64) };
+                let value = obj_to_json(elem)?;
+                row.insert(col_names[col_idx].clone(), value);
+            }
         }
 
-        // Convert row to JSON
-        let row = convert_row_to_json(row_obj)?;
         rows.push(row);
-
-        // Don't drop row_obj - at_idx returns a reference, not a new object
     }
 
     Ok(rows)
 }
 
-/// Convert a row object to JSON
-fn convert_row_to_json(row: ObjP) -> Result<Row, String> {
-    // For now, return empty row - actual implementation would parse row structure
-    // A table row is typically a dict with column names as keys
-    Ok(HashMap::new())
+/// Convert dict to a row
+fn dict_to_row(obj: ObjP) -> Result<Row, String> {
+    let keys = unsafe { rayforce_ffi::ray_key(obj) };
+    let values = unsafe { rayforce_ffi::ray_value(obj) };
+
+    if keys.is_null() || values.is_null() {
+        return Ok(HashMap::new());
+    }
+
+    let keys_ref = unsafe { &*keys };
+    let num_keys = unsafe { keys_ref.len() as usize };
+
+    let mut row = HashMap::new();
+
+    for i in 0..num_keys {
+        let ray_key = unsafe { rayforce_ffi::at_idx(keys, i as i64) };
+        let val_obj = unsafe { rayforce_ffi::at_idx(values, i as i64) };
+
+        let key_name = symbol_to_string(ray_key);
+        let value = obj_to_json(val_obj)?;
+        row.insert(key_name, value);
+    }
+
+    Ok(row)
+}
+
+/// Convert any Rayforce object to JSON value
+fn obj_to_json(obj: ObjP) -> Result<serde_json::Value, String> {
+    if obj.is_null() {
+        return Ok(serde_json::Value::Null);
+    }
+
+    let obj_ref = unsafe { &*obj };
+    let type_code = obj_ref.type_;
+
+    match type_code {
+        // Scalars (negative types)
+        -1 => {
+            // Boolean
+            let val = unsafe { obj_ref.as_i64() };
+            Ok(serde_json::Value::Bool(val != 0))
+        }
+        -2 | -3 | -4 | -5 => {
+            // Integer types
+            let val = unsafe { obj_ref.as_i64() };
+            Ok(serde_json::json!(val))
+        }
+        -6 => {
+            // Symbol - return as string
+            Ok(serde_json::Value::String(symbol_to_string(obj)))
+        }
+        -7 => {
+            // Date - return as integer (days since epoch)
+            let val = unsafe { obj_ref.as_i64() };
+            Ok(serde_json::json!(val))
+        }
+        -8 | -9 => {
+            // Time/Timestamp - return as integer (nanoseconds)
+            let val = unsafe { obj_ref.as_i64() };
+            Ok(serde_json::json!(val))
+        }
+        -10 => {
+            // Float
+            let val = unsafe { obj_ref.as_f64() };
+            Ok(serde_json::json!(val))
+        }
+        -12 => {
+            // Char
+            let val = unsafe { obj_ref.as_i64() as u8 as char };
+            Ok(serde_json::Value::String(val.to_string()))
+        }
+
+        // Vectors (positive types 1-12)
+        t if t >= 1 && t <= 12 => {
+            let len = unsafe { obj_ref.len() as usize };
+            let mut arr = Vec::with_capacity(len);
+            for i in 0..len {
+                let elem = unsafe { rayforce_ffi::at_idx(obj, i as i64) };
+                arr.push(obj_to_json(elem)?);
+            }
+            Ok(serde_json::Value::Array(arr))
+        }
+
+        // List (type 0)
+        0 => {
+            let len = unsafe { obj_ref.len() as usize };
+            let mut arr = Vec::with_capacity(len);
+            for i in 0..len {
+                let elem = unsafe { rayforce_ffi::at_idx(obj, i as i64) };
+                arr.push(obj_to_json(elem)?);
+            }
+            Ok(serde_json::Value::Array(arr))
+        }
+
+        // Table
+        TYPE_TABLE => {
+            Ok(serde_json::json!({"type": "table", "rows": unsafe { obj_ref.len() }}))
+        }
+
+        // Dict
+        99 => {
+            let row = dict_to_row(obj)?;
+            Ok(serde_json::json!(row))
+        }
+
+        // Error
+        TYPE_ERR => {
+            let msg = extract_error_message(obj);
+            Ok(serde_json::json!({"error": msg}))
+        }
+
+        // Null
+        126 => Ok(serde_json::Value::Null),
+
+        _ => Ok(serde_json::json!({"type": type_code})),
+    }
 }

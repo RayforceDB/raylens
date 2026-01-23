@@ -367,8 +367,6 @@ function WidgetsPanel() {
 }
 
 function SettingsPanel() {
-  const serverUrl = useLensStore(state => state.serverUrl);
-  const setServerUrl = useLensStore(state => state.setServerUrl);
   const loadWorkspace = useLensStore(state => state.loadWorkspace);
   const [loadingDemo, setLoadingDemo] = useState(false);
 
@@ -409,12 +407,8 @@ function SettingsPanel() {
       <div className="settings-group">
         <div className="settings-group-title">Connection</div>
         <div className="settings-row">
-          <label className="settings-label">Server URL</label>
-          <input
-            type="text"
-            value={serverUrl}
-            onChange={(e) => setServerUrl(e.target.value)}
-          />
+          <label className="settings-label">Backend</label>
+          <span style={{ color: 'var(--accent)', fontWeight: 500 }}>Native (Embedded)</span>
         </div>
       </div>
 

@@ -5,8 +5,11 @@
 //! with the Rayforce runtime.
 
 use crate::bridge::{QueryMeta, Row};
-use crate::get_bridge;
 use serde::{Deserialize, Serialize};
+
+fn get_bridge() -> &'static std::sync::Arc<crate::bridge::RayforceBridge> {
+    crate::get_bridge()
+}
 
 /// Execute a Rayfall query
 ///

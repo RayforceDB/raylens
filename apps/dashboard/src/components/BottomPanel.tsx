@@ -503,10 +503,10 @@ function ConsolePanel() {
 
 function ReplPanel() {
   const [input, setInput] = useState('');
-  const [history, setHistory] = useState<Array<{ 
-    type: 'input' | 'output' | 'error'; 
-    text: string; 
-    source?: 'local' | 'remote';
+  const [history, setHistory] = useState<Array<{
+    type: 'input' | 'output' | 'error';
+    text: string;
+    source?: 'local' | 'remote' | 'native';
     time?: number;
   }>>([]);
   const connectionStatus = useLensStore(state => state.connectionStatus);

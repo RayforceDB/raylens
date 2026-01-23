@@ -227,6 +227,15 @@ extern "C" {
     /// Get element by object index
     pub fn at_obj(obj: ObjP, idx: ObjP) -> ObjP;
 
+    /// Get keys from dict/table
+    pub fn ray_key(obj: ObjP) -> ObjP;
+
+    /// Get values from dict/table
+    pub fn ray_value(obj: ObjP) -> ObjP;
+
+    /// Get count/length of object
+    pub fn ray_count(obj: ObjP) -> i64;
+
     // =========================================================================
     // Constructors
     // =========================================================================
@@ -323,6 +332,12 @@ impl ObjT {
         self.type_ == TYPE_TABLE
     }
 
+    /// Check if this is a dict
+    #[inline]
+    pub fn is_dict(&self) -> bool {
+        self.type_ == TYPE_DICT
+    }
+
     /// Check if this is an atom (negative type)
     #[inline]
     pub fn is_atom(&self) -> bool {
@@ -335,12 +350,43 @@ impl ObjT {
         self.type_ >= 0 && self.type_ <= TYPE_C8
     }
 
+    /// Check if this is a list (type 0)
+    #[inline]
+    pub fn is_list(&self) -> bool {
+        self.type_ == TYPE_LIST
+    }
+
     /// Get the length of a vector/list/table
     /// Safety: Only valid for vectors/lists/tables
     #[inline]
     pub unsafe fn len(&self) -> i64 {
         // Length is stored at offset 8 in the union
         let ptr = (self as *const ObjT as *const u8).add(8) as *const i64;
+        *ptr
+    }
+
+    /// Get i64 value from scalar
+    /// Safety: Only valid for I64 atoms (type -5)
+    #[inline]
+    pub unsafe fn as_i64(&self) -> i64 {
+        let ptr = (self as *const ObjT as *const u8).add(8) as *const i64;
+        *ptr
+    }
+
+    /// Get f64 value from scalar
+    /// Safety: Only valid for F64 atoms (type -10)
+    #[inline]
+    pub unsafe fn as_f64(&self) -> f64 {
+        let ptr = (self as *const ObjT as *const u8).add(8) as *const f64;
+        *ptr
+    }
+
+    /// Get pointer to vector data
+    /// Safety: Only valid for vectors
+    #[inline]
+    pub unsafe fn data_ptr<T>(&self) -> *const T {
+        // Data pointer is at offset 16 (after len at offset 8)
+        let ptr = (self as *const ObjT as *const u8).add(16) as *const *const T;
         *ptr
     }
 }
