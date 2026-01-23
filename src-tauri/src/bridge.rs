@@ -210,6 +210,22 @@ fn rayforce_thread_main(mut command_rx: mpsc::UnboundedReceiver<RayCommand>) {
     }
     log::info!("Rayforce runtime initialized");
 
+    // Self-test: verify vector data reading works
+    {
+        let test_code = std::ffi::CString::new("(til 10)").unwrap();
+        let result = unsafe { rayforce_ffi::eval_str(test_code.as_ptr()) };
+        if !result.is_null() {
+            let obj = unsafe { &*result };
+            if obj.type_ == 5 {
+                let len = unsafe { obj.len() };
+                let data_ptr = unsafe { obj.data_ptr::<i64>() };
+                let values: Vec<i64> = (0..len as usize).map(|i| unsafe { *data_ptr.add(i) }).collect();
+                eprintln!("[SELF-TEST] (til 10) = {:?}", values);
+            }
+            unsafe { rayforce_ffi::drop_obj(result) };
+        }
+    }
+
     // Handle storage: handle_id -> obj_p
     let mut handles: HashMap<u64, ObjP> = HashMap::new();
     let mut next_handle: u64 = 1;

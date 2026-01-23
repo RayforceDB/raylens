@@ -113,17 +113,33 @@ export async function execute(code: string): Promise<RayforceResult> {
       };
     }
 
-    // For scalars/vectors, fetch the value
-    const rows = await getRows(meta.handle, 0, 1);
+    // For scalars, fetch single value; for vectors, fetch all values
+    if (meta.resultType === 'scalar') {
+      const rows = await getRows(meta.handle, 0, 1);
+      await releaseHandle(meta.handle);
+
+      const value = rows[0]?.value ?? null;
+      return {
+        type: 'scalar',
+        data: value,
+        executionTime: execTime,
+        source: 'local',
+        toJS: () => value,
+      };
+    }
+
+    // Vector - fetch all rows and extract values
+    const rows = await getRows(meta.handle, 0, meta.rowCount);
     await releaseHandle(meta.handle);
 
-    const value = rows[0] ?? null;
+    const values = rows.map(r => r.value);
     return {
-      type: meta.resultType as 'scalar' | 'vector',
-      data: value,
+      type: 'vector',
+      data: values,
+      rowCount: meta.rowCount,
       executionTime: execTime,
       source: 'local',
-      toJS: () => value,
+      toJS: () => values,
     };
   } catch (error) {
     return {
