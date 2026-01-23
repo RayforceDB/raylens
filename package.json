@@ -9,13 +9,16 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace=apps/dashboard",
-    "dev": "npm run dev --workspace=apps/dashboard",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "dev:frontend": "npm run dev --workspace=apps/dashboard",
+    "build:frontend": "npm run build --workspace=apps/dashboard",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint packages apps --ext .ts,.tsx"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2",
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
