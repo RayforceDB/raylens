@@ -383,11 +383,11 @@ impl ObjT {
 
     /// Get pointer to vector data
     /// Safety: Only valid for vectors
+    /// Note: Vector data is stored INLINE starting at offset 16 (not through a pointer)
     #[inline]
     pub unsafe fn data_ptr<T>(&self) -> *const T {
-        // Data pointer is at offset 16 (after len at offset 8)
-        let ptr = (self as *const ObjT as *const u8).add(16) as *const *const T;
-        *ptr
+        // Data is stored inline starting at offset 16 (after header and len)
+        (self as *const ObjT as *const u8).add(16) as *const T
     }
 }
 

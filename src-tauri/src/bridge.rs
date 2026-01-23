@@ -505,16 +505,44 @@ fn get_rows_impl(
         }
         t if t >= 0 && t <= 12 => {
             // Vector - return elements as rows
+            // Read directly from inline data buffer for primitive vectors
             let total = unsafe { obj_ref.len() as u64 };
             let actual_count = std::cmp::min(count, total.saturating_sub(start));
             let mut rows = Vec::with_capacity(actual_count as usize);
 
-            for i in 0..actual_count {
-                let idx = start + i;
-                let elem = unsafe { rayforce_ffi::at_idx(*obj, idx as i64) };
-                let mut row = HashMap::new();
-                row.insert("value".to_string(), obj_to_json(elem)?);
-                rows.push(row);
+            match t {
+                5 => {
+                    // I64 vector - read directly from inline data
+                    let data_ptr = unsafe { obj_ref.data_ptr::<i64>() };
+                    for i in 0..actual_count {
+                        let idx = (start + i) as usize;
+                        let val = unsafe { *data_ptr.add(idx) };
+                        let mut row = HashMap::new();
+                        row.insert("value".to_string(), serde_json::json!(val));
+                        rows.push(row);
+                    }
+                }
+                10 => {
+                    // F64 vector - read directly from inline data
+                    let data_ptr = unsafe { obj_ref.data_ptr::<f64>() };
+                    for i in 0..actual_count {
+                        let idx = (start + i) as usize;
+                        let val = unsafe { *data_ptr.add(idx) };
+                        let mut row = HashMap::new();
+                        row.insert("value".to_string(), serde_json::json!(val));
+                        rows.push(row);
+                    }
+                }
+                _ => {
+                    // Other vector types - use at_idx
+                    for i in 0..actual_count {
+                        let idx = start + i;
+                        let elem = unsafe { rayforce_ffi::at_idx(*obj, idx as i64) };
+                        let mut row = HashMap::new();
+                        row.insert("value".to_string(), obj_to_json(elem)?);
+                        rows.push(row);
+                    }
+                }
             }
             Ok(rows)
         }
