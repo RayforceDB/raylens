@@ -54,11 +54,22 @@ export interface Workspace {
   dashboards: Dashboard[];
   queries: Query[];
   activeDashboardId: string | null;
-  serverUrl: string;
 }
 
 // App modes
 export type AppMode = 'dev' | 'live';
+
+// Server connections for remote Rayforce servers
+export type ServerConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export interface ServerConnection {
+  id: string;
+  alias: string;           // Symbol name: "srv1", "prod", etc.
+  host: string;            // e.g., "localhost"
+  port: number;            // e.g., 8765
+  status: ServerConnectionStatus;
+  errorMessage?: string;
+}
 
 // ============================================================================
 // STORE STATE
@@ -71,7 +82,9 @@ interface LensState {
 
   // Connection
   connectionStatus: ConnectionStatus;
-  serverUrl: string;
+
+  // Remote server connections
+  serverConnections: ServerConnection[];
 
   // App Mode
   appMode: AppMode;
@@ -92,9 +105,13 @@ interface LensState {
 
   // Actions
   setConnectionStatus: (status: ConnectionStatus) => void;
-  setServerUrl: (url: string) => void;
   setAppMode: (mode: AppMode) => void;
   toggleAppMode: () => void;
+
+  // Server connection actions
+  addServerConnection: (alias: string, host: string, port: number) => string;
+  removeServerConnection: (id: string) => void;
+  updateServerConnectionStatus: (id: string, status: ServerConnectionStatus, errorMessage?: string) => void;
 
   // Query actions
   addQuery: (name: string, code: string) => string;
@@ -134,73 +151,19 @@ interface LensState {
 
 const createDefaultWorkspace = (): Workspace => {
   const dashboardId = uuid();
-  const basicMathId = uuid();
-  const vectorOpId = uuid();
-  const aggSumId = uuid();
 
   return {
     id: uuid(),
-    name: 'Rayfall Workspace',
-    serverUrl: 'native',
+    name: 'New Workspace',
     activeDashboardId: dashboardId,
-    queries: [
-      // Basic math
-      {
-        id: basicMathId,
-        name: 'Basic Math',
-        code: '(+ 1 2 3)',
-        isRunning: false,
-      },
-      // Vector operations
-      {
-        id: vectorOpId,
-        name: 'Vector Ops',
-        code: '(* [1 2 3 4 5] 10)',
-        isRunning: false,
-      },
-      // Aggregation
-      {
-        id: aggSumId,
-        name: 'Sum Vector',
-        code: '(sum [1 2 3 4 5])',
-        isRunning: false,
-      },
-    ],
+    queries: [],
     dashboards: [
       {
         id: dashboardId,
-        name: 'Main Dashboard',
+        name: 'Dashboard 1',
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        widgets: [
-          // Text widget for basic math result
-          {
-            id: uuid(),
-            type: 'text',
-            title: 'Sum: 1+2+3',
-            binding: { queryId: basicMathId, refreshInterval: 0, autoRun: false },
-            config: { fontSize: 48, prefix: '= ', suffix: '' },
-            position: { x: 0, y: 0, w: 4, h: 2 },
-          },
-          // Text widget for aggregation
-          {
-            id: uuid(),
-            type: 'text',
-            title: 'Sum of Vector',
-            binding: { queryId: aggSumId, refreshInterval: 0, autoRun: false },
-            config: { fontSize: 48, prefix: '= ', suffix: '' },
-            position: { x: 4, y: 0, w: 4, h: 2 },
-          },
-          // Grid for vector output
-          {
-            id: uuid(),
-            type: 'grid',
-            title: 'Vector * 10',
-            binding: { queryId: vectorOpId, refreshInterval: 0, autoRun: false },
-            config: {},
-            position: { x: 8, y: 0, w: 4, h: 2 },
-          },
-        ],
+        widgets: [],
       },
     ],
   };
@@ -224,7 +187,7 @@ export const useLensStore = create<LensState>()((set, get) => ({
   user: getSavedAuth() || { username: 'dev', role: 'admin' as const },
   isAuthenticated: true, // Skip login for native Tauri app
   connectionStatus: 'disconnected',
-  serverUrl: 'ws://localhost:8765',
+  serverConnections: [],
   appMode: 'dev',
   workspace: createDefaultWorkspace(),
   selectedWidgetId: null,
@@ -246,9 +209,26 @@ export const useLensStore = create<LensState>()((set, get) => ({
   // Connection actions
   setConnectionStatus: (status) => set({ connectionStatus: status }),
 
-  setServerUrl: (url) => set((state) => ({
-    serverUrl: url,
-    workspace: { ...state.workspace, serverUrl: url },
+  // Server connection actions
+  addServerConnection: (alias, host, port) => {
+    const id = uuid();
+    set((state) => ({
+      serverConnections: [
+        ...state.serverConnections,
+        { id, alias, host, port, status: 'disconnected' as const },
+      ],
+    }));
+    return id;
+  },
+
+  removeServerConnection: (id) => set((state) => ({
+    serverConnections: state.serverConnections.filter((c) => c.id !== id),
+  })),
+
+  updateServerConnectionStatus: (id, status, errorMessage) => set((state) => ({
+    serverConnections: state.serverConnections.map((c) =>
+      c.id === id ? { ...c, status, errorMessage } : c
+    ),
   })),
 
   // App mode actions

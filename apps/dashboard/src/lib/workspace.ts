@@ -1,8 +1,22 @@
-import { Workspace, Query } from '../store';
+import { Workspace, Query, AppMode, ServerConnection } from '../store';
 import { toast } from '../components/Toast';
 
 const STORAGE_KEY = 'raylens-workspace';
 const WORKSPACES_KEY = 'raylens-workspaces';
+const UI_STATE_KEY = 'raylens-ui-state';
+const SERVER_CONNECTIONS_KEY = 'raylens-server-connections';
+
+// UI state that should be persisted
+export interface PersistedUIState {
+  appMode: AppMode;
+  sidebarTab: 'queries' | 'widgets' | 'settings' | 'data';
+  bottomPanelOpen: boolean;
+  bottomPanelHeight: number;
+}
+
+// Debounce timer for auto-save
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+const AUTO_SAVE_DELAY = 1000; // 1 second debounce
 
 /**
  * Strip transient data from workspace before persisting.
@@ -68,7 +82,93 @@ export function loadWorkspaceFromStorage(): Workspace | null {
 export function clearWorkspaceStorage(): void {
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(WORKSPACES_KEY);
+  localStorage.removeItem(UI_STATE_KEY);
+  localStorage.removeItem(SERVER_CONNECTIONS_KEY);
   console.log('[Workspace] Cleared storage');
+}
+
+// ============================================================================
+// UI STATE PERSISTENCE
+// ============================================================================
+
+export function saveUIStateToStorage(state: PersistedUIState): void {
+  try {
+    localStorage.setItem(UI_STATE_KEY, JSON.stringify(state));
+  } catch (err) {
+    console.error('[Workspace] Failed to save UI state:', err);
+  }
+}
+
+export function loadUIStateFromStorage(): PersistedUIState | null {
+  try {
+    const data = localStorage.getItem(UI_STATE_KEY);
+    if (data) {
+      return JSON.parse(data) as PersistedUIState;
+    }
+  } catch (err) {
+    console.error('[Workspace] Failed to load UI state:', err);
+  }
+  return null;
+}
+
+// ============================================================================
+// SERVER CONNECTIONS PERSISTENCE
+// ============================================================================
+
+export function saveServerConnectionsToStorage(connections: ServerConnection[]): void {
+  try {
+    // Only save the connection config, not the runtime status
+    const toSave = connections.map(c => ({
+      id: c.id,
+      alias: c.alias,
+      host: c.host,
+      port: c.port,
+    }));
+    localStorage.setItem(SERVER_CONNECTIONS_KEY, JSON.stringify(toSave));
+  } catch (err) {
+    console.error('[Workspace] Failed to save server connections:', err);
+  }
+}
+
+export function loadServerConnectionsFromStorage(): ServerConnection[] {
+  try {
+    const data = localStorage.getItem(SERVER_CONNECTIONS_KEY);
+    if (data) {
+      const parsed = JSON.parse(data) as Array<{ id: string; alias: string; host: string; port: number }>;
+      // Restore with disconnected status
+      return parsed.map(c => ({
+        ...c,
+        status: 'disconnected' as const,
+      }));
+    }
+  } catch (err) {
+    console.error('[Workspace] Failed to load server connections:', err);
+  }
+  return [];
+}
+
+// ============================================================================
+// AUTO-SAVE
+// ============================================================================
+
+export function scheduleAutoSave(
+  workspace: Workspace,
+  uiState: PersistedUIState,
+  serverConnections: ServerConnection[]
+): void {
+  // Clear any pending save
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+  }
+
+  // Schedule a new save
+  autoSaveTimer = setTimeout(() => {
+    saveWorkspaceToStorage(workspace);
+    saveUIStateToStorage(uiState);
+    saveServerConnectionsToStorage(serverConnections);
+    console.log('[Workspace] Auto-saved');
+    autoSaveTimer = null;
+  }, AUTO_SAVE_DELAY);
 }
 
 export function getWorkspacesList(): Array<{ id: string; name: string; updatedAt: number }> {

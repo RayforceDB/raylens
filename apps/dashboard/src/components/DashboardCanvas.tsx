@@ -231,8 +231,20 @@ function WidgetWrapper({ widget, isSelected, onSelect, isDevMode }: WidgetWrappe
   const [isResizing, setIsResizing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragPos, setDragPos] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [resizePos, setResizePos] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [localSize, setLocalSize] = useState({ w: widget.position.w, h: widget.position.h });
-  const resizeRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
+  const resizeRef = useRef<{
+    startMouseX: number;
+    startMouseY: number;
+    startPixelW: number;
+    startPixelH: number;
+    startGridW: number;
+    startGridH: number;
+    elemLeft: number;
+    elemTop: number;
+    gridUnitX: number;
+    gridUnitY: number;
+  } | null>(null);
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; elemX: number; elemY: number; elemW: number; elemH: number } | null>(null);
   const widgetRef = useRef<HTMLDivElement>(null);
 
@@ -338,52 +350,101 @@ function WidgetWrapper({ widget, isSelected, onSelect, isDevMode }: WidgetWrappe
     }
   }, [boundQuery, isSimpleTableQuery, totalRows]);
   
-  // Handle widget resize
+  // Handle widget resize - use pixel-based tracking like drag
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    if (!isDevMode) return;
+    if (!isDevMode || !widgetRef.current) return;
     e.preventDefault();
     e.stopPropagation();
-    resizeRef.current = { 
-      startX: e.clientX, 
-      startY: e.clientY, 
-      startW: localSize.w, 
-      startH: localSize.h 
+
+    // Find the grid container to calculate accurate grid units
+    const gridContainer = widgetRef.current.closest('.dashboard-grid');
+    if (!gridContainer) return;
+
+    const widgetRect = widgetRef.current.getBoundingClientRect();
+    const gridRect = gridContainer.getBoundingClientRect();
+    const gap = 12; // CSS gap value
+    // Column width = (container width - 11 gaps) / 12
+    const colWidth = (gridRect.width - 11 * gap) / 12;
+    const rowHeight = 60; // CSS grid-auto-rows value
+
+    resizeRef.current = {
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      startPixelW: widgetRect.width,
+      startPixelH: widgetRect.height,
+      startGridW: localSize.w,
+      startGridH: localSize.h,
+      elemLeft: widgetRect.left,
+      elemTop: widgetRect.top,
+      // Grid unit = column/row size + gap (since each additional unit adds one gap)
+      gridUnitX: colWidth + gap,
+      gridUnitY: rowHeight + gap,
     };
+    // Start with current dimensions
+    setResizePos({
+      x: widgetRect.left,
+      y: widgetRect.top,
+      w: widgetRect.width,
+      h: widgetRect.height,
+    });
     setIsResizing(true);
   }, [isDevMode, localSize]);
-  
+
   useEffect(() => {
     if (!isResizing) return;
-    
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!resizeRef.current) return;
-      // Each grid unit is roughly 80px
-      const gridUnit = 80;
-      const deltaX = e.clientX - resizeRef.current.startX;
-      const deltaY = e.clientY - resizeRef.current.startY;
-      const newW = Math.max(2, Math.min(12, resizeRef.current.startW + Math.round(deltaX / gridUnit)));
-      const newH = Math.max(2, Math.min(12, resizeRef.current.startH + Math.round(deltaY / gridUnit)));
-      setLocalSize({ w: newW, h: newH });
+      const { startMouseX, startMouseY, startPixelW, startPixelH, elemLeft, elemTop } = resizeRef.current;
+      const deltaX = e.clientX - startMouseX;
+      const deltaY = e.clientY - startMouseY;
+
+      // Update pixel position to follow mouse smoothly
+      setResizePos({
+        x: elemLeft,
+        y: elemTop,
+        w: Math.max(100, startPixelW + deltaX),
+        h: Math.max(100, startPixelH + deltaY),
+      });
     };
-    
-    const handleMouseUp = () => {
-      if (activeDashboardId && (localSize.w !== widget.position.w || localSize.h !== widget.position.h)) {
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (!resizeRef.current || !activeDashboardId) {
+        setResizePos(null);
+        setIsResizing(false);
+        resizeRef.current = null;
+        return;
+      }
+
+      const { startMouseX, startMouseY, startGridW, startGridH, gridUnitX, gridUnitY } = resizeRef.current;
+      const deltaX = e.clientX - startMouseX;
+      const deltaY = e.clientY - startMouseY;
+
+      // Calculate new grid size
+      const newW = Math.max(2, Math.min(12 - widget.position.x, startGridW + Math.round(deltaX / gridUnitX)));
+      const newH = Math.max(2, Math.min(20, startGridH + Math.round(deltaY / gridUnitY)));
+
+      // Update local size and persist if changed
+      setLocalSize({ w: newW, h: newH });
+      if (newW !== widget.position.w || newH !== widget.position.h) {
         updateWidget(activeDashboardId, widget.id, {
-          position: { ...widget.position, w: localSize.w, h: localSize.h }
+          position: { ...widget.position, w: newW, h: newH }
         });
       }
+
+      setResizePos(null);
       setIsResizing(false);
       resizeRef.current = null;
     };
-    
+
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-    
+
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, localSize, widget, activeDashboardId, updateWidget]);
+  }, [isResizing, widget, activeDashboardId, updateWidget]);
   
   // Sync local size with widget position when widget changes externally
   useEffect(() => {
@@ -468,7 +529,7 @@ function WidgetWrapper({ widget, isSelected, onSelect, isDevMode }: WidgetWrappe
     };
   }, [isDragging, activeDashboardId, widget, updateWidget]);
 
-  // Widget style - use fixed position during drag
+  // Widget style - use fixed position during drag or resize
   const style: React.CSSProperties = isDragging && dragPos ? {
     position: 'fixed',
     left: dragPos.x,
@@ -477,6 +538,15 @@ function WidgetWrapper({ widget, isSelected, onSelect, isDevMode }: WidgetWrappe
     height: dragPos.h,
     zIndex: 1000,
     cursor: 'grabbing',
+    boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+  } : isResizing && resizePos ? {
+    position: 'fixed',
+    left: resizePos.x,
+    top: resizePos.y,
+    width: resizePos.w,
+    height: resizePos.h,
+    zIndex: 1000,
+    cursor: 'se-resize',
     boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
   } : {
     gridColumnStart: widget.position.x + 1,
@@ -586,7 +656,7 @@ function WidgetWrapper({ widget, isSelected, onSelect, isDevMode }: WidgetWrappe
   return (
     <div
       ref={widgetRef}
-      className={`widget ${isSelected && isDevMode ? 'selected' : ''} ${isDevMode ? '' : 'live-mode'} ${isDragging ? 'dragging' : ''}`}
+      className={`widget ${isSelected && isDevMode ? 'selected' : ''} ${isDevMode ? '' : 'live-mode'} ${isDragging ? 'dragging' : ''} ${isResizing ? 'resizing' : ''}`}
       style={style}
       onClick={(e) => {
         if (!isDevMode) return;

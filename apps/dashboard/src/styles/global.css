@@ -87,68 +87,84 @@ body {
   background: var(--text-muted);
 }
 
-/* AG Grid Theme - Shared base styles */
+/* AG Grid Theme - Clean, modern styling */
 .ag-theme-alpine,
 .ag-theme-alpine-dark {
   --ag-background-color: var(--bg-surface);
   --ag-header-background-color: var(--bg-elevated);
   --ag-odd-row-background-color: var(--bg-surface);
-  --ag-even-row-background-color: var(--bg-surface);
-  --ag-border-color: var(--border-subtle);
-  --ag-secondary-border-color: var(--border-subtle);
-  --ag-header-foreground-color: var(--text-secondary);
+  --ag-even-row-background-color: rgba(0, 0, 0, 0.02);
+  --ag-border-color: transparent;
+  --ag-secondary-border-color: transparent;
+  --ag-header-foreground-color: var(--text-muted);
   --ag-foreground-color: var(--text-primary);
-  --ag-row-hover-color: rgba(59, 130, 246, 0.08);
-  --ag-selected-row-background-color: rgba(59, 130, 246, 0.12);
-  --ag-range-selection-background-color: rgba(59, 130, 246, 0.15);
-  --ag-font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  --ag-row-hover-color: rgba(59, 130, 246, 0.06);
+  --ag-selected-row-background-color: rgba(59, 130, 246, 0.1);
+  --ag-range-selection-background-color: rgba(59, 130, 246, 0.12);
+  --ag-font-family: var(--font-mono);
   --ag-font-size: 12px;
   --ag-grid-size: 4px;
-  --ag-row-height: 28px;
-  --ag-header-height: 36px;
-  --ag-cell-horizontal-padding: 10px;
-  --ag-row-border-color: var(--border-subtle);
-  --ag-header-column-separator-color: var(--border-strong);
+  --ag-row-height: 32px;
+  --ag-header-height: 40px;
+  --ag-cell-horizontal-padding: 12px;
+  --ag-row-border-color: transparent;
+  --ag-header-column-separator-color: var(--border-subtle);
   --ag-header-column-resize-handle-color: var(--accent-blue);
 }
 
-/* Uniform row backgrounds - no alternating stripes */
-.ag-theme-alpine .ag-row,
+/* Subtle alternating row backgrounds */
 .ag-theme-alpine .ag-row-odd,
-.ag-theme-alpine .ag-row-even,
-.ag-theme-alpine-dark .ag-row,
-.ag-theme-alpine-dark .ag-row-odd,
-.ag-theme-alpine-dark .ag-row-even {
+.ag-theme-alpine-dark .ag-row-odd {
   background-color: var(--bg-surface) !important;
 }
 
-/* Cell backgrounds - allow cellStyle to override */
+.ag-theme-alpine .ag-row-even,
+.ag-theme-alpine-dark .ag-row-even {
+  background-color: rgba(0, 0, 0, 0.015) !important;
+}
+
+/* Cell backgrounds - allow cellStyle to override, no transitions to prevent flash */
 .ag-theme-alpine .ag-cell,
 .ag-theme-alpine-dark .ag-cell {
   background-color: transparent;
+  transition: none !important;
+}
+
+/* Disable all cell flash/highlight animations */
+.ag-theme-alpine .ag-cell-data-changed,
+.ag-theme-alpine-dark .ag-cell-data-changed,
+.ag-theme-alpine .ag-cell-highlight,
+.ag-theme-alpine-dark .ag-cell-highlight,
+.ag-theme-alpine .ag-cell-highlight-animation,
+.ag-theme-alpine-dark .ag-cell-highlight-animation {
+  background-color: inherit !important;
+  transition: none !important;
+  animation: none !important;
 }
 
 .ag-theme-alpine .ag-root-wrapper,
 .ag-theme-alpine-dark .ag-root-wrapper {
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  border: none;
+  border-radius: 0;
   overflow: hidden;
   background: var(--bg-surface);
 }
 
 .ag-theme-alpine .ag-header,
 .ag-theme-alpine-dark .ag-header {
-  background: var(--bg-elevated) !important;
-  border-bottom: 1px solid var(--border-strong);
+  background: var(--bg-surface) !important;
+  border-bottom: 1px solid var(--border-subtle);
   font-weight: 500;
   font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .ag-theme-alpine .ag-header-cell,
 .ag-theme-alpine-dark .ag-header-cell {
-  padding-left: 10px;
-  padding-right: 10px;
-  border-right: 1px solid var(--border-subtle);
+  padding-left: 12px;
+  padding-right: 12px;
+  border-right: none;
 }
 
 .ag-theme-alpine .ag-header-cell:last-child,
@@ -163,7 +179,7 @@ body {
 
 .ag-theme-alpine .ag-cell,
 .ag-theme-alpine-dark .ag-cell {
-  border-right: 1px solid var(--border-subtle);
+  border-right: none;
   display: flex;
   align-items: center;
 }
@@ -704,35 +720,60 @@ input:focus, select:focus {
   color: var(--accent-blue);
 }
 
-/* Resize Handle */
+/* Resize Handle - subtle, elegant style */
 .resize-handle {
   position: absolute;
   background: transparent;
-  z-index: 10;
+  z-index: 100;
+  transition: all 0.2s ease;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  background: var(--border-subtle);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.resize-handle:hover::after,
+.resize-handle.active::after {
+  opacity: 1;
+  background: var(--accent-blue);
 }
 
 .resize-handle-horizontal {
-  height: 6px;
+  height: 12px;
   cursor: ns-resize;
   left: 0;
   right: 0;
+  margin-top: -6px;
 }
 
-.resize-handle-horizontal:hover,
-.resize-handle-horizontal.active {
-  background: var(--accent-blue);
+.resize-handle-horizontal::after {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
 }
 
 .resize-handle-vertical {
-  width: 6px;
+  width: 12px;
   cursor: ew-resize;
   top: 0;
   bottom: 0;
+  margin-left: -6px;
 }
 
-.resize-handle-vertical:hover,
-.resize-handle-vertical.active {
-  background: var(--accent-blue);
+.resize-handle-vertical::after {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 40px;
+  border-radius: 2px;
 }
 
 /* Collapsible Panel */

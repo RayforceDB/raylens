@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useLensStore } from '../store';
+import { invoke } from '@tauri-apps/api/core';
+import { useLensStore, ServerConnection } from '../store';
 import { rayforceClient } from '../App';
 import { toast } from './Toast';
 
@@ -106,63 +107,227 @@ export function Sidebar() {
 
 
 function DataPanel() {
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const serverConnections = useLensStore(state => state.serverConnections);
+  const addServerConnection = useLensStore(state => state.addServerConnection);
+  const removeServerConnection = useLensStore(state => state.removeServerConnection);
+  const updateServerConnectionStatus = useLensStore(state => state.updateServerConnectionStatus);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newAlias, setNewAlias] = useState('');
+  const [newHost, setNewHost] = useState('localhost');
+  const [newPort, setNewPort] = useState('8765');
+  const [isConnecting, setIsConnecting] = useState<string | null>(null);
 
-    if (!file.name.endsWith('.csv')) {
-      toast.error('Only .csv files are supported');
+  const handleAddConnection = () => {
+    if (!newAlias.trim()) {
+      toast.error('Alias is required');
+      return;
+    }
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(newAlias)) {
+      toast.error('Alias must be a valid symbol name (letters, numbers, underscores)');
+      return;
+    }
+    if (serverConnections.some(c => c.alias === newAlias)) {
+      toast.error('A connection with this alias already exists');
       return;
     }
 
-    setIsUploading(true);
-    try {
-      const text = await file.text();
-      // Derive table name from filename (remove extension, sanitize)
-      const tableName = file.name.replace(/\.csv$/i, '').replace(/[^a-zA-Z0-9_]/g, '_');
+    const port = parseInt(newPort, 10);
+    if (isNaN(port) || port < 1 || port > 65535) {
+      toast.error('Port must be a valid number (1-65535)');
+      return;
+    }
 
-      await rayforceClient?.loadCSV(tableName, text);
-      toast.success(`Loaded table '${tableName}'`);
+    addServerConnection(newAlias.trim(), newHost.trim(), port);
+    setNewAlias('');
+    setNewHost('localhost');
+    setNewPort('8765');
+    setShowAddForm(false);
+    toast.success(`Added connection "${newAlias}"`);
+  };
+
+  const handleConnect = async (conn: ServerConnection) => {
+    setIsConnecting(conn.id);
+    updateServerConnectionStatus(conn.id, 'connecting');
+
+    try {
+      await invoke('connect_server', {
+        alias: conn.alias,
+        host: conn.host,
+        port: conn.port,
+      });
+      updateServerConnectionStatus(conn.id, 'connected');
+      toast.success(`Connected to ${conn.alias}`);
     } catch (err) {
-      console.error('Failed to load CSV:', err);
-      toast.error(`Failed to load CSV: ${(err as Error).message}`);
+      updateServerConnectionStatus(conn.id, 'error', String(err));
+      toast.error(`Failed to connect: ${err}`);
     } finally {
-      setIsUploading(false);
-      // Reset input so same file can be selected again if needed
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      setIsConnecting(null);
+    }
+  };
+
+  const handleDisconnect = async (conn: ServerConnection) => {
+    try {
+      await invoke('disconnect_server', { alias: conn.alias });
+      updateServerConnectionStatus(conn.id, 'disconnected');
+      toast.success(`Disconnected from ${conn.alias}`);
+    } catch (err) {
+      toast.error(`Failed to disconnect: ${err}`);
+    }
+  };
+
+  const handleRemove = (conn: ServerConnection) => {
+    if (conn.status === 'connected') {
+      handleDisconnect(conn);
+    }
+    removeServerConnection(conn.id);
+  };
+
+  const getStatusColor = (status: ServerConnection['status']) => {
+    switch (status) {
+      case 'connected': return 'var(--accent-green)';
+      case 'connecting': return 'var(--accent-amber)';
+      case 'error': return 'var(--accent-red)';
+      default: return 'var(--text-muted)';
     }
   };
 
   return (
     <div className="sidebar-section">
       <div className="sidebar-section-header">
-        <span className="sidebar-section-title">Data Sources</span>
+        <span className="sidebar-section-title">Server Connections</span>
+        <button
+          className="sidebar-section-action"
+          onClick={() => setShowAddForm(!showAddForm)}
+          title="Add connection"
+        >
+          +
+        </button>
       </div>
 
-      <div style={{ padding: '0 12px' }}>
-        <button
-          className="settings-btn"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          style={{ width: '100%', justifyContent: 'center' }}
-        >
-          {isUploading ? 'Loading...' : 'Import CSV'}
-        </button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          style={{ display: 'none' }}
-          accept=".csv"
-          onChange={handleFileChange}
-        />
+      {showAddForm && (
+        <div style={{ padding: '0 12px', marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input
+              type="text"
+              placeholder="Alias (e.g., srv1, prod)"
+              value={newAlias}
+              onChange={(e) => setNewAlias(e.target.value)}
+              style={{ padding: '8px 12px', fontSize: 13 }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="text"
+                placeholder="Host"
+                value={newHost}
+                onChange={(e) => setNewHost(e.target.value)}
+                style={{ flex: 2, padding: '8px 12px', fontSize: 13 }}
+              />
+              <input
+                type="text"
+                placeholder="Port"
+                value={newPort}
+                onChange={(e) => setNewPort(e.target.value)}
+                style={{ flex: 1, padding: '8px 12px', fontSize: 13 }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleAddConnection}
+                style={{ flex: 1 }}
+              >
+                Add
+              </button>
+              <button
+                className="btn btn-sm"
+                onClick={() => setShowAddForm(false)}
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-        <p style={{ marginTop: 12, fontSize: 11, color: 'var(--text-muted)' }}>
-          Imported CSV files become available as tables in queries. The table name will match the filename.
+      <div style={{ padding: '0 12px' }}>
+        {serverConnections.length === 0 ? (
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+            No remote server connections configured.
+            <br /><br />
+            Add a connection to execute queries on remote Rayforce servers using <code style={{ background: 'var(--bg-elevated)', padding: '2px 4px', borderRadius: 3 }}>(write alias expr)</code>.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {serverConnections.map((conn) => (
+              <div
+                key={conn.id}
+                style={{
+                  padding: '10px 12px',
+                  background: 'var(--bg-panel)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 6,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        background: getStatusColor(conn.status),
+                      }}
+                    />
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>{conn.alias}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {conn.status === 'connected' ? (
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => handleDisconnect(conn)}
+                        style={{ padding: '4px 8px', fontSize: 11 }}
+                      >
+                        Disconnect
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleConnect(conn)}
+                        disabled={isConnecting === conn.id}
+                        style={{ padding: '4px 8px', fontSize: 11 }}
+                      >
+                        {isConnecting === conn.id ? 'Connecting...' : 'Connect'}
+                      </button>
+                    )}
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => handleRemove(conn)}
+                      style={{ padding: '4px 8px', fontSize: 11, color: 'var(--accent-red)' }}
+                      title="Remove connection"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                  {conn.host}:{conn.port}
+                </div>
+                {conn.status === 'error' && conn.errorMessage && (
+                  <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>
+                    {conn.errorMessage}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: '12px', borderTop: '1px solid var(--border-subtle)', marginTop: 12 }}>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
+          <strong>Usage:</strong> Once connected, use <code style={{ background: 'var(--bg-elevated)', padding: '2px 4px', borderRadius: 3 }}>(write alias expr)</code> to run queries on the remote server.
         </p>
       </div>
     </div>
@@ -307,20 +472,6 @@ const WidgetIcons = {
       <path d="M8 20h8" strokeLinecap="round" />
     </svg>
   ),
-  control: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <circle cx="12" cy="12" r="3" />
-      <circle cx="12" cy="12" r="8" />
-      <path d="M12 4v2M12 18v2M4 12h2M18 12h2" strokeLinecap="round" />
-    </svg>
-  ),
-  'query-editor': (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M8 6l-4 6 4 6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M16 6l4 6-4 6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M14 4l-4 16" strokeLinecap="round" />
-    </svg>
-  ),
 };
 
 function WidgetsPanel() {
@@ -331,8 +482,6 @@ function WidgetsPanel() {
     { type: 'chart-pie', label: 'Pie Chart' },
     { type: 'chart-candle', label: 'Candlestick' },
     { type: 'text', label: 'Text/KPI' },
-    { type: 'control', label: 'Control' },
-    { type: 'query-editor', label: 'Query Editor' },
   ];
 
   return (
@@ -450,10 +599,8 @@ function SettingsPanel() {
           <div>(select {'{'}cnt: (count col) from: table by: grp{'}'})</div>
           <div style={{ marginBottom: 8 }}>(select {'{'}from: table where: (== col val){'}'})</div>
 
-          <div style={{ marginBottom: 8, color: 'var(--text-muted)' }}>;; Directives</div>
-          <div>@local  ;; force local WASM</div>
-          <div>@remote ;; force server</div>
-          <div>@timeout:5000</div>
+          <div style={{ marginBottom: 8, color: 'var(--text-muted)' }}>;; Remote execution</div>
+          <div>(write srv1 expr) ;; run on server "srv1"</div>
         </div>
       </div>
     </div>

@@ -508,8 +508,9 @@ export function DataGridWidget({
       hasToJS: typeof result?.toJS === 'function',
     });
     
-    // Helper to add unique row IDs
-    const addRowIds = (rows: Record<string, unknown>[]) => 
+    // Helper to add unique row IDs - use simple index-based IDs
+    // With animateRows=false, index-based IDs work well for streaming data
+    const addRowIds = (rows: Record<string, unknown>[]) =>
       rows.map((row, idx) => ({ ...row, __rowId: `row-${idx}` }));
     
     // Extract data based on type - check for RayforceResult types
@@ -529,29 +530,30 @@ export function DataGridWidget({
       if (typeof val === 'number' || typeof val === 'string' || typeof val === 'boolean' || val === null) {
         // Simple scalar - single row
         columns = ['value'];
-        rows = [{ value: val, __rowId: 'scalar-0' }];
+        rows = [{ value: val, __rowId: `scalar-${String(val)}` }];
       } else if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
         // Dict/object - expand to rows
         const dict = val as Record<string, unknown>;
         columns = Object.keys(dict);
         if (columns.length === 0) {
           columns = ['value'];
-          rows = [{ value: val, __rowId: 'scalar-0' }];
+          rows = [{ value: val, __rowId: `scalar-${String(val)}` }];
         } else {
           const firstCol = dict[columns[0]];
           const rowCount = Array.isArray(firstCol) ? firstCol.length : 1;
           for (let i = 0; i < rowCount; i++) {
-            const row: Record<string, unknown> = { __rowId: `dict-${i}` };
+            const row: Record<string, unknown> = {};
             for (const key of columns) {
               const col = dict[key];
               row[key] = Array.isArray(col) ? col[i] : col;
             }
+            row.__rowId = `row-${i}`;
             rows.push(row);
           }
         }
       } else {
         columns = ['value'];
-        rows = [{ value: val, __rowId: 'scalar-0' }];
+        rows = [{ value: val, __rowId: `scalar-${String(val)}` }];
       }
     } else if (Array.isArray(data)) {
       // Raw array data (not RayforceResult)
@@ -565,7 +567,7 @@ export function DataGridWidget({
     } else if (typeof data === 'number' || typeof data === 'string' || typeof data === 'boolean') {
       // Raw scalar (not wrapped in RayforceResult)
       columns = ['value'];
-      rows = [{ value: data, __rowId: 'raw-scalar-0' }];
+      rows = [{ value: data, __rowId: `scalar-${String(data)}` }];
     } else if (typeof data === 'object' && data !== null && !('type' in data)) {
       // Raw object/dict (not RayforceResult)
       const dict = data as Record<string, unknown>;
@@ -574,11 +576,12 @@ export function DataGridWidget({
         const firstCol = dict[columns[0]];
         const rowCount = Array.isArray(firstCol) ? firstCol.length : 1;
         for (let i = 0; i < rowCount; i++) {
-          const row: Record<string, unknown> = { __rowId: `raw-dict-${i}` };
+          const row: Record<string, unknown> = {};
           for (const key of columns) {
             const col = dict[key];
             row[key] = Array.isArray(col) ? col[i] : col;
           }
+          row.__rowId = `row-${i}`;
           rows.push(row);
         }
       }
@@ -720,17 +723,30 @@ export function DataGridWidget({
       if (colorConfig) {
         def.cellStyle = (params: CellClassParams): Record<string, string | number> | null | undefined => {
           const val = params.value;
-          
+          // Skip empty/null/undefined values - return undefined to not override default
+          if (val === null || val === undefined || val === '') return undefined;
+
           if (colorConfig.type === 'preset' && colorConfig.preset) {
             const preset = COLOR_PRESETS[colorConfig.preset];
-            
-            // Handle value-based presets (status, buy-sell)
+
+            // Handle value-based presets (status, buy-sell) - softer style
             if (preset && 'values' in preset && preset.values) {
-              const strVal = String(val || '').toUpperCase();
-              const color = preset.values[strVal];
-              if (color) return { background: color, color: '#fff', fontWeight: 600 };
+              const strVal = String(val).toUpperCase();
+              // Only apply if the exact value exists in preset values
+              if (Object.prototype.hasOwnProperty.call(preset.values, strVal)) {
+                const color = preset.values[strVal];
+                return {
+                  background: `${color}18`,
+                  color: color,
+                  fontWeight: 600,
+                  borderLeft: `3px solid ${color}`,
+                  paddingLeft: '9px'
+                };
+              }
+              // No match - return undefined to not apply any style
+              return undefined;
             }
-            
+
             // Handle rule-based presets (positive-negative, heat-map)
             if (preset && 'rules' in preset && preset.rules) {
               const numVal = typeof val === 'number' ? val : parseFloat(String(val));
@@ -741,7 +757,7 @@ export function DataGridWidget({
                     case 'positive': matches = numVal > 0; break;
                     case 'negative': matches = numVal < 0; break;
                     case 'zero': matches = numVal === 0; break;
-                    case 'range': 
+                    case 'range':
                       matches = numVal >= (rule.min ?? -Infinity) && numVal < (rule.max ?? Infinity);
                       break;
                   }
@@ -750,15 +766,43 @@ export function DataGridWidget({
               }
             }
           }
-          
-          // Handle custom colors
+
+          // Handle custom colors - use softer styling
           if (colorConfig.type === 'custom' && colorConfig.customColors) {
-            const strVal = String(val || '').toUpperCase();
-            const color = colorConfig.customColors[strVal] || colorConfig.customColors[String(val || '')];
-            if (color) return { background: color, color: '#fff', fontWeight: 600 };
+            const strVal = String(val).toUpperCase();
+            // STRICT check: only apply if the exact value exists as a key
+            if (Object.prototype.hasOwnProperty.call(colorConfig.customColors, strVal)) {
+              const color = colorConfig.customColors[strVal];
+              if (color && typeof color === 'string') {
+                return {
+                  background: `${color}18`, // 10% opacity
+                  color: color,
+                  fontWeight: 600,
+                  borderLeft: `3px solid ${color}`,
+                  paddingLeft: '9px'
+                };
+              }
+            }
+            // Also check original case
+            const originalVal = String(val);
+            if (Object.prototype.hasOwnProperty.call(colorConfig.customColors, originalVal)) {
+              const color = colorConfig.customColors[originalVal];
+              if (color && typeof color === 'string') {
+                return {
+                  background: `${color}18`,
+                  color: color,
+                  fontWeight: 600,
+                  borderLeft: `3px solid ${color}`,
+                  paddingLeft: '9px'
+                };
+              }
+            }
+            // No match found - don't apply any style
+            return undefined;
           }
-          
-          return null;
+
+          // No matching config - don't apply any style
+          return undefined;
         };
       }
       // Fallback to legacy columnColors format
@@ -766,10 +810,39 @@ export function DataGridWidget({
         const customColors = columnColors[name];
         if (customColors && Object.keys(customColors).length > 0) {
           def.cellStyle = (params: CellClassParams) => {
-            const val = String(params.value || '').toUpperCase();
-            const color = customColors[val] || customColors[String(params.value || '')];
-            if (color) return { background: color, color: '#fff', fontWeight: 600 };
-            return null;
+            const val = params.value;
+            // Skip empty/null/undefined
+            if (val === null || val === undefined || val === '') return undefined;
+
+            const strVal = String(val).toUpperCase();
+            // STRICT check: only apply if the exact value exists as a key
+            if (Object.prototype.hasOwnProperty.call(customColors, strVal)) {
+              const color = customColors[strVal];
+              if (color && typeof color === 'string') {
+                return {
+                  background: `${color}18`,
+                  color: color,
+                  fontWeight: 600,
+                  borderLeft: `3px solid ${color}`,
+                  paddingLeft: '9px'
+                };
+              }
+            }
+            // Also check original case
+            const originalVal = String(val);
+            if (Object.prototype.hasOwnProperty.call(customColors, originalVal)) {
+              const color = customColors[originalVal];
+              if (color && typeof color === 'string') {
+                return {
+                  background: `${color}18`,
+                  color: color,
+                  fontWeight: 600,
+                  borderLeft: `3px solid ${color}`,
+                  paddingLeft: '9px'
+                };
+              }
+            }
+            return undefined;
           };
         }
       }
@@ -828,12 +901,14 @@ export function DataGridWidget({
             filter: true,
             resizable: true,
           }}
-          animateRows={true}
+          animateRows={false}
+          enableCellChangeFlash={false}
+          suppressCellFocus={true}
           rowSelection="multiple"
           suppressRowClickSelection={true}
-          headerHeight={32}
-          rowHeight={28}
-          getRowId={(params: GetRowIdParams) => params.data?.__rowId || params.data?.id || String(Math.random())}
+          headerHeight={40}
+          rowHeight={32}
+          getRowId={(params: GetRowIdParams) => params.data?.__rowId || params.data?.id || `fallback-${JSON.stringify(params.data).slice(0, 50)}`}
         />
       </div>
       

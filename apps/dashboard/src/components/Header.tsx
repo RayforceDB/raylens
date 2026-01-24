@@ -1,4 +1,3 @@
-import { useState, useEffect, useRef } from 'react';
 import { useLensStore } from '../store';
 import { toast, confirm } from './Toast';
 import {
@@ -9,61 +8,14 @@ import {
   clearWorkspaceStorage,
 } from '../lib/workspace';
 
-// FPS counter hook
-function useFps() {
-  const [fps, setFps] = useState(0);
-  const frameCount = useRef(0);
-  const lastTime = useRef(performance.now());
-  const rafId = useRef<number>();
-
-  useEffect(() => {
-    const updateFps = () => {
-      frameCount.current++;
-      const now = performance.now();
-      const delta = now - lastTime.current;
-
-      if (delta >= 1000) {
-        setFps(Math.round((frameCount.current * 1000) / delta));
-        frameCount.current = 0;
-        lastTime.current = now;
-      }
-
-      rafId.current = requestAnimationFrame(updateFps);
-    };
-
-    rafId.current = requestAnimationFrame(updateFps);
-    return () => {
-      if (rafId.current) cancelAnimationFrame(rafId.current);
-    };
-  }, []);
-
-  return fps;
-}
-
-interface HeaderProps {
-  onConnect: () => void;
-}
-
-export function Header({ onConnect }: HeaderProps) {
+export function Header() {
   const workspace = useLensStore(state => state.workspace);
   const workspaceName = workspace.name;
   const connectionStatus = useLensStore(state => state.connectionStatus);
-  const serverUrl = useLensStore(state => state.serverUrl);
-  const setServerUrl = useLensStore(state => state.setServerUrl);
   const appMode = useLensStore(state => state.appMode);
   const user = useLensStore(state => state.user);
   const logout = useLensStore(state => state.logout);
-  
-  const [editingUrl, setEditingUrl] = useState(false);
-  const [urlValue, setUrlValue] = useState(serverUrl);
-  const fps = useFps();
 
-  const handleUrlSubmit = () => {
-    setServerUrl(urlValue);
-    setEditingUrl(false);
-    onConnect();
-  };
-  
   const isDevMode = appMode === 'dev';
   
   return (
@@ -128,48 +80,13 @@ export function Header({ onConnect }: HeaderProps) {
         
         {/* Connection Status */}
         <div className="connection-status">
-          <span 
-            className={`status-dot status-${connectionStatus === 'connected' ? 'connected' : connectionStatus === 'connecting' ? 'connecting' : 'disconnected'}`} 
+          <span
+            className={`status-dot status-${connectionStatus === 'connected' ? 'connected' : connectionStatus === 'connecting' ? 'connecting' : 'disconnected'}`}
           />
-          {isDevMode && editingUrl ? (
-            <input
-              type="text"
-              value={urlValue}
-              onChange={(e) => setUrlValue(e.target.value)}
-              onBlur={handleUrlSubmit}
-              onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
-              className="connection-url"
-              autoFocus
-              style={{ width: 150 }}
-            />
-          ) : isDevMode ? (
-            <span 
-              className="connection-url" 
-              onClick={() => setEditingUrl(true)}
-              style={{ cursor: 'pointer' }}
-            >
-              {serverUrl}
-            </span>
-          ) : (
-            <span className="connection-label">
-              {connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
-            </span>
-          )}
-        </div>
-
-        {/* FPS Counter */}
-        <div className="fps-counter" title="Frames per second">
-          <span className={`fps-value ${fps < 30 ? 'fps-low' : fps < 50 ? 'fps-medium' : 'fps-good'}`}>
-            {fps}
+          <span className="connection-label">
+            {connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
           </span>
-          <span className="fps-label">FPS</span>
         </div>
-
-        {connectionStatus !== 'connected' && (
-          <button className="btn btn-primary btn-sm" onClick={onConnect}>
-            Connect
-          </button>
-        )}
 
         {/* Dev Mode Actions */}
         {isDevMode && (

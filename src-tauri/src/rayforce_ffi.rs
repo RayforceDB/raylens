@@ -313,6 +313,10 @@ extern "C" {
 
     /// Create an error object with message
     pub fn ray_err(msg: *const c_char) -> ObjP;
+
+    /// Get interned string from symbol ID
+    /// Returns pointer to the interned string (do not free)
+    pub fn str_from_symbol(id: i64) -> *const c_char;
 }
 
 // =============================================================================

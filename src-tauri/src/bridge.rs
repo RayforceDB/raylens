@@ -386,19 +386,31 @@ fn extract_table_meta(obj: ObjP) -> Result<(Vec<String>, HashMap<String, String>
     let mut columns = Vec::with_capacity(num_cols);
     let mut column_types = HashMap::new();
 
-    // Extract column names from symbol vector
+    // Get values (column vectors) to extract types
+    let values = unsafe { rayforce_ffi::ray_value(obj) };
+
+    // Extract column names and types
     for i in 0..num_cols {
         let col_sym = unsafe { rayforce_ffi::at_idx(keys, i as i64) };
         if !col_sym.is_null() {
             let col_name = symbol_to_string(col_sym);
+
+            // Get the column vector type
+            if !values.is_null() {
+                let col_vec = unsafe { rayforce_ffi::at_idx(values, i as i64) };
+                if !col_vec.is_null() {
+                    let col_ref = unsafe { &*col_vec };
+                    let type_str = get_type_name(col_ref.type_);
+                    column_types.insert(col_name.clone(), type_str);
+                }
+            }
+
             columns.push(col_name);
         }
     }
 
-    // Get values to determine row count
-    let values = unsafe { rayforce_ffi::ray_value(obj) };
+    // Get row count from first column
     let row_count = if !values.is_null() {
-        // Values is a list of column vectors, get length of first column
         let first_col = unsafe { rayforce_ffi::at_idx(values, 0) };
         if !first_col.is_null() {
             let first_ref = unsafe { &*first_col };
@@ -415,6 +427,16 @@ fn extract_table_meta(obj: ObjP) -> Result<(Vec<String>, HashMap<String, String>
     };
 
     Ok((columns, column_types, row_count))
+}
+
+/// Get Rayforce type name string from type code
+fn get_type_name(type_code: i8) -> String {
+    let type_ptr = unsafe { rayforce_ffi::type_name(type_code) };
+    if type_ptr.is_null() {
+        return format!("type_{}", type_code);
+    }
+    let c_str = unsafe { std::ffi::CStr::from_ptr(type_ptr) };
+    c_str.to_string_lossy().to_string()
 }
 
 /// Extract dict metadata
@@ -446,11 +468,15 @@ fn symbol_to_string(obj: ObjP) -> String {
     }
     let obj_ref = unsafe { &*obj };
 
-    // For symbol atoms (type -6), the data is a pointer to the interned string
+    // For symbol atoms (type -6), the data contains the interned symbol ID
     if obj_ref.type_ == -6 {
-        // Symbol data is stored differently - use eval to convert
-        // For now, use a simple index-based name
-        format!("col_{}", unsafe { obj_ref.as_i64() })
+        let symbol_id = unsafe { obj_ref.as_i64() };
+        let str_ptr = unsafe { rayforce_ffi::str_from_symbol(symbol_id) };
+        if str_ptr.is_null() {
+            return format!("sym_{}", symbol_id);
+        }
+        let c_str = unsafe { std::ffi::CStr::from_ptr(str_ptr) };
+        c_str.to_string_lossy().to_string()
     } else if obj_ref.type_ == 12 || obj_ref.type_ == -12 {
         // C8 vector or char - it's a string
         let len = if obj_ref.type_ > 0 {
@@ -679,14 +705,19 @@ fn obj_to_json(obj: ObjP) -> Result<serde_json::Value, String> {
             Ok(serde_json::Value::String(symbol_to_string(obj)))
         }
         -7 => {
-            // Date - return as integer (days since epoch)
-            let val = unsafe { obj_ref.as_i64() };
-            Ok(serde_json::json!(val))
+            // Date - format as YYYY.MM.DD
+            let val = unsafe { obj_ref.as_i64() } as i32;
+            Ok(serde_json::Value::String(format_date(val)))
         }
-        -8 | -9 => {
-            // Time/Timestamp - return as integer (nanoseconds)
+        -8 => {
+            // Time - format as HH:MM:SS.mmm (milliseconds since midnight)
+            let val = unsafe { obj_ref.as_i64() } as i32;
+            Ok(serde_json::Value::String(format_time(val)))
+        }
+        -9 => {
+            // Timestamp - format as YYYY.MM.DDTHH:MM:SS.nnnnnnnnn (nanoseconds since epoch)
             let val = unsafe { obj_ref.as_i64() };
-            Ok(serde_json::json!(val))
+            Ok(serde_json::Value::String(format_timestamp(val)))
         }
         -10 => {
             // Float
@@ -743,4 +774,50 @@ fn obj_to_json(obj: ObjP) -> Result<serde_json::Value, String> {
 
         _ => Ok(serde_json::json!({"type": type_code})),
     }
+}
+
+/// Format date value (days since 2000.01.01) as YYYY.MM.DD
+fn format_date(days: i32) -> String {
+    // Rayforce epoch is 2000.01.01
+    const EPOCH_DAYS: i64 = 10957; // Days from 1970.01.01 to 2000.01.01
+    let unix_days = days as i64 + EPOCH_DAYS;
+    let secs = unix_days * 86400;
+
+    let dt = chrono::DateTime::from_timestamp(secs, 0)
+        .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+    dt.format("%Y.%m.%d").to_string()
+}
+
+/// Format time value (milliseconds since midnight) as HH:MM:SS.mmm
+fn format_time(ms: i32) -> String {
+    if ms < 0 {
+        // Handle negative times
+        let abs_ms = (-ms) as u32;
+        let hours = abs_ms / 3600000;
+        let mins = (abs_ms % 3600000) / 60000;
+        let secs = (abs_ms % 60000) / 1000;
+        let millis = abs_ms % 1000;
+        format!("-{:02}:{:02}:{:02}.{:03}", hours, mins, secs, millis)
+    } else {
+        let ms = ms as u32;
+        let hours = ms / 3600000;
+        let mins = (ms % 3600000) / 60000;
+        let secs = (ms % 60000) / 1000;
+        let millis = ms % 1000;
+        format!("{:02}:{:02}:{:02}.{:03}", hours, mins, secs, millis)
+    }
+}
+
+/// Format timestamp value (nanoseconds since Rayforce epoch 2000.01.01) as YYYY.MM.DDTHH:MM:SS.nnnnnnnnn
+fn format_timestamp(ns: i64) -> String {
+    // Rayforce epoch is 2000.01.01 00:00:00
+    const EPOCH_NS: i64 = 946684800_000_000_000; // Nanoseconds from Unix epoch to 2000.01.01
+    let unix_ns = ns + EPOCH_NS;
+    let secs = unix_ns / 1_000_000_000;
+    let nanos = (unix_ns % 1_000_000_000) as u32;
+
+    let dt = chrono::DateTime::from_timestamp(secs, nanos)
+        .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+    // Format similar to Rayforce: just time portion since date is usually same day
+    dt.format("%H:%M:%S%.3f").to_string()
 }

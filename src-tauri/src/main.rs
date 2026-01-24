@@ -14,12 +14,15 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             raylens_lib::commands::execute_query,
             raylens_lib::commands::execute_scalar,
             raylens_lib::commands::get_rows,
             raylens_lib::commands::release_handle,
             raylens_lib::commands::cancel_query,
+            raylens_lib::commands::connect_server,
+            raylens_lib::commands::disconnect_server,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

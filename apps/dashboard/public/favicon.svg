@@ -1,20 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="rayGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#0284c7;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <!-- Outer ring -->
-  <circle cx="32" cy="32" r="28" fill="none" stroke="url(#rayGrad)" stroke-width="4"/>
-  <!-- Inner lens -->
-  <circle cx="32" cy="32" r="16" fill="url(#rayGrad)" opacity="0.3"/>
-  <circle cx="32" cy="32" r="8" fill="url(#rayGrad)"/>
-  <!-- Light rays -->
-  <g stroke="url(#rayGrad)" stroke-width="2" stroke-linecap="round">
-    <line x1="32" y1="4" x2="32" y2="12"/>
-    <line x1="32" y1="52" x2="32" y2="60"/>
-    <line x1="4" y1="32" x2="12" y2="32"/>
-    <line x1="52" y1="32" x2="60" y2="32"/>
-  </g>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="#1a2a3a"/>
+
+  <!-- Hexagon outline (simplified) -->
+  <path d="M32 6 L54 18 L54 42 L32 54 L10 42 L10 18 Z"
+        fill="none"
+        stroke="#04233b"
+        stroke-width="4"
+        stroke-linejoin="round"/>
+
+  <!-- Stylized R -->
+  <path d="M22 46 L22 20 L36 20 C42 20 46 24 46 30 C46 36 42 40 36 40 L28 40 L42 54"
+        fill="none"
+        stroke="#ffffff"
+        stroke-width="5"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Lightning bolt accent -->
+  <path d="M38 14 L28 32 L36 32 L26 50"
+        fill="none"
+        stroke="#e9a033"
+        stroke-width="3"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
 </svg>

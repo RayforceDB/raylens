@@ -22,7 +22,9 @@
       "Bash(nm:*)",
       "Bash(ls:*)",
       "Bash(make:*)",
-      "Bash(flutter build:*)"
+      "Bash(flutter build:*)",
+      "Bash(./src-tauri/target/release/raylens:*)",
+      "Bash(convert:*)"
     ]
   }
 }
